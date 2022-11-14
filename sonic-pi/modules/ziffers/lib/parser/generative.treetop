@@ -1,0 +1,1273 @@
+grammar GenerativeSyntax
+
+  rule base
+    (enclosed_set / ignore /  assign_set / control / use / escaped_multi_octave / escaped_multi_scale / repeat / euclid / interpolate / zip_ring / cyclic / set / conditional_assingment / ranges / relative_duration / decimal_duration / roman / group  / random_decimal / multi_escape / eval / pitch_classes / array / multi_duration / multioctave / rest /  s / bar / parens)*
+    {
+      def value
+        e = elements.collect {|v| v.value }.compact.map.with_index do |v,i|
+          if v.is_a?(Hash) then
+            if v[:subset]
+              v = resolve_subsets(v[:subset], v[:subduration]/v[:subset].length)
+              v.map {|h| h.to_z }.join(" ")
+            elsif v[:cycle]
+              cycle = resolve_cycle(v, "R"+i.to_s)
+              cycle.to_z
+            else
+              v.to_z
+            end
+          elsif v.is_a?(Array)
+            v.flatten.map {|v| v.is_a?(Hash) ? (v[:subset] ? resolve_subsets(v[:subset], v[:subduration]/v[:subset].length).map {|h| h.to_z }.join(" ") : v.to_z) : v}
+          else
+           v.to_s
+          end
+        end
+        e.reject {|e| e.to_s.empty? }.join(" ")
+      end
+    }
+  end
+
+  rule enclosed_set
+    p:(ignore_params / set_duration) s:(set)
+    {
+      def value
+        val = s.value
+        if val.is_a?(Array)
+          p.value+"("+val.flatten.map {|v| v.is_a?(Hash) ? (v[:subset] ? resolve_subsets(v[:subset], v[:subduration]/v[:subset].length).map {|h| h.to_z }.join(" ") : v.to_z) : v}.join(" ")+")"
+        else
+          p.value+(val.is_a?(Hash) ? val.to_z : v)
+        end
+      end
+    }
+  end
+
+  rule set_duration
+    [a-z]+
+    {
+    def value
+      text_value
+    end
+    }
+  end
+
+  rule set
+    set_scale:(prefix_scale)? '(' ':'? content:(set_items) repeat_two:(':')? repeat_times:(integer)? ')' p:(('~' / '?') [1-9]*)? t:(transform)? a:(array_method)? o:(operation)* eval_f:(ternary)? select_range:(set_range)?
+    {
+    def value
+
+      reps = repeat_times.value if repeat_times.methods.include?(:value)
+      reps = (reps and reps>1) ? reps : (repeat_two.text_value==":" ? 2 : 1)
+      Thread.current[:tshared][:set_index] = (Thread.current[:tshared][:set_index] || 0) + 1
+      Thread.current[:tshared][:set_repeat_index] = (Thread.current[:tshared][:set_repeat_index] || 0) + 1 if reps>1
+
+      set = reps.times.collect do |i|
+
+        original_set = content.value.flatten
+        set = Marshal.load(Marshal.dump(original_set))
+
+        # Resolve cycles and create loop counters for each cycle
+
+        set_id = ((Thread.current[:tshared][:set_repeat_index] || 0) > 0 ? 0 : Thread.current[:tshared][:set_index]).to_s
+        set  = set.map.with_index {|v,n| v = resolve_cycle(v, "S"+set_id+"_"+((Thread.current[:tshared][:set_cycle_index] || 0) + 1).to_s+"_"+n.to_s, reps) if v.is_a?(Hash) and v[:cycle] ; v }.flatten.compact
+
+        set = ZiffArray.new(set)
+
+        # Call for ZiffArray methods
+        if a.methods.include?(:value)
+          method_call = a.value
+          resolved_set = set.resolve_strings # Resolve note lengths & octaves for the list
+          if method_call[1]
+            if method_call[1].is_a?(ZiffArray)
+              pcs = method_call[1].flatten.map {|h| h.is_a?(ZiffHash) ? h[:pc] : nil }.compact
+              if ["fuse"].include?(method_call[0]) # Exception for list methods
+                param = method_call[1].resolve_strings
+                set = resolved_set.method(method_call[0]).(param)
+              else
+                set = pcs.map {|pc| resolved_set.method(method_call[0]).(pc) }
+              end
+            else
+              set = resolved_set.method(method_call[0]).(*method_call[1])
+            end
+          else
+            set = resolved_set.method(method_call[0]).()
+          end
+          set = set.to_a.flatten if !set.is_a?(Array) # This is for enumerations like array permutation & combination
+        end
+
+        # Special shorthands for unique list and splitting chords to sequences or vice versa
+        if t.methods.include?(:value)
+          t.value.split("").each do |transform|
+            case transform
+            when "!"
+              set = set.compact.uniq
+            when "$"
+              set = set.compact.map{|v| (v[:hpcs] ? v[:hpcs].map{|h| h[:pc]} : v[:pc].to_s.split("")).map{|d| ZiffHash[{pc: d.to_i}] } }.flatten
+            when "&"
+              set = set.compact.map do |v|
+                if !v[:hpcs]
+                  v[:hpcs] = v[:pc].to_s.split("").map{|i| ZiffHash[{pc: i.to_i }] }
+                  v.delete(:pc)
+                end
+                v
+              end
+            end
+          end
+        end
+
+        if p and p.text_value != ""
+          set = set.shuffle if p.text_value[0]=="~"
+          set = p.text_value[0]=="~" ? set.take(p.text_value[1..].to_i) : set.pick(p.text_value[1..].to_i) if p.text_value.length>1
+        end
+
+        if !o.empty? then
+          o.elements.each do |op|
+            if op.methods.include?(:value) then
+              op_values = ZiffArray.new(op.value.flatten.compact) if op.value.is_a?(Array)
+              case op.operator
+              when '**', '*', '/', '+', '-', '^', '%', '|', '&', '<<', '>>'
+                if op.value.kind_of?(Array)
+                    set = op_values.map do |z|
+                        set.map  do |c|
+                            c_dup = Marshal.load(Marshal.dump(c))
+                            z_dup = Marshal.load(Marshal.dump(z))
+
+                            if z and c
+                              if z.is_a?(Hash) and c.is_a?(Hash)
+                                if z[:pc] and c[:pc]
+                                  c_dup[:pc] = z[:pc].method(op.operator).(c[:pc])
+                                elsif z[:hpcs] and c[:pc]
+                                  c_dup[:hpcs] = z_dup[:hpcs].map {|h| h = Marshal.load(Marshal.dump(h)) ; h[:pc] = h[:pc].method(op.operator).(c[:pc]); h}
+                                  c_dup.delete(:pc)
+                                elsif c[:hpcs] and z[:pc]
+                                  c_dup[:hpcs] = c[:hpcs].map {|h| h = Marshal.load(Marshal.dump(h)) ; h[:pc] = h[:pc].method(op.operator).(z[:pc]); h}
+                                elsif c[:hpcs] and z[:hpcs]
+                                  c_dup[:hpcs] = c_dup[:hpcs].map {|ch| z[:hpcs].map{|zh| zh = Marshal.load(Marshal.dump(zh)) ; zh[:pc] = zh[:pc].method(op.operator).(ch[:pc]) ; zh }}.flatten
+                                end
+                              end
+                            end
+                            c_dup
+                        end
+                      end
+                    set = set.flatten
+
+                else
+                    operation_value = op.value.to_i
+
+                    set = set.map do |v|
+                      v = Marshal.load(Marshal.dump(v))
+                      if v.is_a?(Hash)
+                        if v[:pc]
+                          v[:pc] = v[:pc].to_i.method(op.operator).(operation_value)
+                        elsif v[:hpcs]
+                          v[:hpcs] = v[:hpcs].map {|h| h = Marshal.load(Marshal.dump(h)) ; h[:pc] = h[:pc].method(op.operator).(operation_value); h }
+                        end
+                      end
+                      v
+                    end
+
+                end
+
+              when '<+>'
+                set = set.product(op_values).flatten if op_values
+              when '<->'
+                set = set-op_values if op_values
+              when '<*>'
+                if op_values
+                set = set.ois.map do |v|
+                  op_values.map do |z|
+                    z = Marshal.load(Marshal.dump(z))
+                    if z[:hpcs] and v.is_a?(Array)
+                      z[:hpcs] = v.map {|ival| z[:hpcs].map {|h|  ZiffHash[{pc: h[:pc]+ival}] }}.flatten
+                    elsif z[:pc] and v.is_a?(Array)
+                        z[:hpcs] = v.map {|ival| ZiffHash[{pc: z[:pc]+ival}] }
+                        z.delete(:pc)
+                    elsif z[:hpcs] and v.is_a?(Integer)
+                      z[:hpcs] = z[:hpcs].map {|h|  h[:pc] = h[:pc]+v ; h }
+                    else
+                       z[:pc] =  z[:pc]+v
+                     end
+                     z
+                    end
+                  end
+                end
+                set = set.flatten
+              when '<&>'
+                set = set&op_values if op_values
+              when '<|>'
+                set = set|op_values if op_values
+              when '@'
+                set = set.gen_arp(op_values)
+              when '#'
+                set = set.gen_select(op_values)
+              end
+            end
+          end
+        end
+
+        if eval_f.methods.include?(:value)
+          tfunc = eval_f.value
+          set = set.compact.map do |v|
+            if v.is_a?(Hash)
+              if v[:pc]
+                v[:pc] = eval_func(v[:pc],tfunc)
+              elsif v[:hpcs]
+                v[:hpcs] = v[:hpcs].map do |h|
+                  h[:pc] = eval_func(h[:pc],tfunc)
+                end
+                v
+              end
+            end
+            v
+          end
+        end
+        set
+      end # End repeat
+
+      Thread.current[:tshared][:set_repeat_index] = Thread.current[:tshared][:set_repeat_index]-1 if Thread.current[:tshared][:set_repeat_index] and reps>1
+
+      scale_prefix = set_scale.value if set_scale.methods.include?(:value)
+      if scale_prefix
+        set = set.flatten.map {|v| v[:prefix] = (v[:prefix] || "")+scale_prefix[:prefix] if v.is_a?(Hash) ; v  }
+      else
+        set = set.flatten(1) # Flatten only 1st level, second level used in euclid to separate lists
+      end
+
+      if select_range.methods.include?(:value)
+        selection_range = select_range.value
+        if selection_range.kind_of?(Array)
+          set = [set[*selection_range]]
+        else
+          set = [set[selection_range]]
+        end
+      end
+
+      ZiffArray.new(set)
+    end
+
+    def eval_func(v,tfunc)
+      if tfunc.is_a?(Array)
+        cond = eval tfunc[0].gsub("x",v.to_s)
+        if cond
+          eval_func v, tfunc[1]
+        else
+          eval_func v, tfunc[2]
+        end
+      else
+        eval tfunc.gsub("x",v.to_s)
+      end
+    end
+    }
+  end
+
+  rule zip_ring
+    first:(set) '<>' second:(set)
+    {
+      def value
+        first_set = ZiffArray.new(first.value.compact)
+        second_set = ZiffArray.new(second.value.compact)
+        first_set.zip_ring(second_set).flatten
+      end
+    }
+  end
+
+  rule interpolate
+    first:(set) '<' val:(integer) '>' second:(set)
+    {
+      def value
+        intervals = first.value
+        divisions = second.value
+        nodes = val.value
+
+        filtered_set = intervals.filter{|h| h.is_a?(Hash) and h[:pc] }
+        divisions = divisions.map {|h| h[:pc]}.compact
+        new_pcs = 1.upto(nodes).collect { |i| [i * divisions[i%divisions.length]] + filtered_set.map { |x| (i * divisions[i%divisions.length]) + x[:pc]+1 }}.flatten
+        new_hpcs = new_pcs.map.with_index{|pc,i| ziff = filtered_set[i%filtered_set.length].dup; ziff[:pc] = pc-1 ; ziff.update_note }
+        ZiffArray.new(new_hpcs.flatten)
+      end
+    }
+  end
+
+    rule euclid
+      '(' onbeat:(set_items) rb:(')<' / ')>') s:(min_max) ',' e:(min_max) ','? r:(min_max)? lb:('>' / '<') opt:('(' offbeat:(set_items) ')')?
+      {
+      def value
+        on_i = 0
+        off_i = 0
+        onbeat_list = onbeat.value.compact
+        onbeat_list = onbeat_list.select {|h| h.kind_of?(Hash) or h.kind_of?(Array) }
+        if !opt.empty?
+          offbeat_list = opt.offbeat.value.compact if !opt.offbeat.empty? and opt.offbeat.methods.include?(:value)
+          offbeat_list = offbeat_list.select {|h| h.kind_of?(Hash) || h.kind_of?(Array)  }
+        end
+        Thread.current[:tshared][:euclid_cycle_index] = (Thread.current[:tshared][:euclid_cycle_index] || 0) + 1
+        cycle_id = "E"+Thread.current[:tshared][:euclid_cycle_index].to_s
+        result = euclidean_morrill(s.value,e.value)
+        .map.with_index do |n,ei|
+          if n==1 # On beat
+            vals = resolve_cycle({cycle: onbeat_list},cycle_id+"OR")
+            if rb.text_value==')>' # No randomization & cycles per run
+              vals = resolve_cycle(vals,cycle_id+"O"+ei.to_s) if vals.is_a?(Hash) && vals[:cycle]
+            else # List as ring with randomize
+              vals = resolve_cycle(vals,cycle_id+"O"+(on_i%onbeat_list.length).to_s) if vals.is_a?(Hash) && vals[:cycle]
+              onbeat_list = onbeat.value.compact # Rerandomize
+            end
+            on_i+=1
+          else # Off beat
+            if offbeat_list
+              vals = resolve_cycle({cycle: offbeat_list},cycle_id+"FR")
+              if lb.text_value=='<' # No randomization & cycles per run
+                vals = resolve_cycle(vals,cycle_id+"F"+ei.to_s) if vals.is_a?(Hash) && vals[:cycle]
+              else # List as ring with randomize
+                vals = resolve_cycle(vals,cycle_id+"F"+(off_i%offbeat_list.length).to_s) if vals.is_a?(Hash) && vals[:cycle]
+                offbeat_list = opt.offbeat.value.compact # Rerandomize
+              end
+              off_i+=1
+            else
+              vals = "r"
+            end
+          end
+          vals
+        end
+        (!r.empty? and r.methods.include?(:value)) ? result.rotate(-r.value) : result
+      end
+      }
+    end
+
+    rule array_method
+      '<' v:([a-z_]+) '>' i:(('(' r:(min_max_list) ')' / r:(set)))?
+      {
+      def value
+        [v.text_value,(i.empty?) ? nil : i.r.value]
+      end
+      }
+    end
+
+  rule transform
+    [\!\$\&]+
+    {
+    def value
+      text_value
+    end
+    }
+  end
+
+  rule assign_set
+    k:([ABCDFGHIJKLMNOPQRSUWXYZO]) '=' set
+    {
+      def value
+        Thread.current[:tshared][:use] = {} if !Thread.current[:tshared][:use]
+        Thread.current[:tshared][:use][k.text_value] = set.value.flatten.map {|v| v.is_a?(Hash) ? (v[:subset] ? resolve_subsets(v[:subset], v[:subduration]/v[:subset].length) : v) : v}
+        nil
+      end
+    }
+  end
+
+    rule use
+      prefix:(prefix_list)? k:([ABCDFGHIJKLMNOPQRSUWXYZO]+)
+      {
+        def value
+        prefixes = prefix.value.flatten.inject{|a,b| a.merge(b){|_,x,y| x + y}} if prefix.methods.include?(:value)
+        prefixes = {} if !prefixes
+
+          use_val = k.text_value
+
+          if use_val.length==1 and Thread.current[:tshared][:use] and Thread.current[:tshared][:use][use_val]
+            Thread.current[:tshared][:use][use_val]
+          else
+            v = {char: k.text_value}
+            v[:prefix] = prefixes[:prefix] if prefixes[:prefix]
+            v[:duration] = prefixes[:duration] if prefixes[:duration]
+            ZiffHash[v]
+          end
+        end
+      }
+    end
+
+  rule rest
+    s:(duration)? 'r'
+    {
+      def value
+        v = ZiffHash[{note: :r}]
+        if s.methods.include?(:value)
+          v[:duration] = s.value
+        else
+          v[:subduration] = Thread.current[:topts][:duration] if Thread.current[:topts][:duration]
+        end
+        v
+     end
+    }
+  end
+
+  rule operation
+    op:('**' / '*' / '+' / '-' / '/' / '^' / '%' / '|' / '&' / '<<' / '>>' / '#' / '@' / '<@>' / '<&>' / '<->' / '<+>' / '<*>' / '<|>') val:('-'? [0-9]+ / set / array / random_between)
+    {
+    def operator
+      op.text_value
+    end
+    def value
+     if val.methods.include?(:value)
+        v = val.value
+        v
+      else
+        val.text_value
+      end
+    end
+    }
+  end
+
+  rule parens
+    '[' parens_subset ']'
+    {
+      def value
+        s = parens_subset.elements.collect { |v| v.value }.filter_map {|v| v if v.is_a?(Hash)}
+        {:subset=>s, :subduration=>Thread.current[:topts][:duration]}
+      end
+    }
+  end
+
+  rule repeat
+   '[:' l:(set_items) ':' p:([0-9])* ']'
+    {
+       def value
+         rep_result = ["|"]
+         r = !p.text_value.empty? ? p.text_value.to_i : 2
+         rep_value = l.value
+         rep_value = rep_value.map {|v| (v.is_a?(Hash) and v[:subset]) ? resolve_subsets(v[:subset], v[:subduration]/v[:subset].length) : v }
+         r.times do |i|
+          rep = rep_value.each_with_object([]).with_index do |(v,o),ri|
+            if v.is_a?(Hash) and v[:cycle]
+              o.push(resolve_cycle(v,"R"+((Thread.current[:tshared][:repeat_cycle_index] || 0) + 1).to_s+"_"+ri.to_s,r))
+            else
+              o.push(v)
+            end
+          end
+          rep_result += rep+["|"] # Break for octaves, note lengths etc.
+          end
+         rep_result.flatten.compact
+       end
+     }
+  end
+
+  rule array
+    '[' first:(set_items) rest:(',' i:set_items)+ ']'
+    {
+    def value
+      if rest.empty?
+        first.value
+      else
+        r = rest.elements.map {|v| v.i.value }
+        r.prepend(first.value).pick.compact
+      end
+    end
+    }
+  end
+
+  rule set_items
+    (ignore / ranges / repeat / use / control / escaped_multi_octave / escaped_multi_scale / decimal_duration / group / roman / cyclic / eval / pitch_classes / multi_duration / multioctave / rest / s / array / random_between / conditional_assingment / parens / bar / euclid / interpolate / zip_ring / set)*
+    {
+    def value
+      elements.map {|v| v.value }.compact
+    end
+    }
+  end
+
+  rule cyclic_items
+    (ignore / ranges / use / control / escaped_multi_octave / escaped_multi_scale / decimal_duration / group / roman / cyclic / eval / pitch_classes / multi_duration / multioctave / rest / array / random_between / conditional_assingment / parens / bar / euclid / interpolate / zip_ring / set)*
+    {
+    def value
+      elements.map {|v| v.value }.compact
+    end
+    }
+  end
+
+  rule parens_subset
+    (ignore / use / control / ranges / escaped_multi_octave / escaped_multi_scale / group / roman / eval / pitch_classes / multioctave / rest / s / random_between / parens)*
+    {
+    def value
+      elements.map {|v| v.value }
+    end
+    }
+  end
+
+  rule cyclic
+  '<' ' '* first:(cyclic_items) following:(' ' i:cyclic_items)+ ' '* '>'
+    {
+    def value
+        r = following.elements.map {|v| v.i.value }
+        r.prepend(first.value)
+        r = r.compact
+        {:cycle=>r}
+    end
+    }
+  end
+
+  rule function_call
+    func:([a-z]* '{' [a-zA-Z]+) function_params? '}'
+    {
+      def value
+        func.text_value + (function_params.empty? ? "" : function_params.value)
+      end
+    }
+  end
+
+  rule function_params
+    '(' val:(decimal / integer / random_between / ',')* ')'
+    {
+      def value
+        val.elements.map {|v| v.methods.include?(:value) ? v.value : v.text_value }.join("")
+      end
+    }
+  end
+
+  rule control
+    c:([A-Z]) v:(escaped_random / integer / escaped_decimal / escaped_text)
+    {
+      def value
+        c.text_value+v.value.to_s
+      end
+    }
+  end
+
+  rule escaped_random
+    '<' v:(random_between / random_decimal) '>'
+    {
+      def value
+        "<"+v.value.to_s+">"
+      end
+    }
+  end
+
+  rule escaped_decimal
+  '<' decimal '>'
+  {
+    def value
+      text_value
+    end
+   }
+  end
+
+  rule escaped_text
+   '<' e:([\sa-zA-Z0-9:\-]*) '>'
+   {
+     def value
+      text_value
+     end
+    }
+  end
+
+  # Characters ignored by generative parsing and parsed using ziffers parser
+  rule ignore
+    v:(reset  / slide / arpeggio / ignore_function / ignore_comment / ignore_params)
+    {
+      def value
+        v.value.to_s
+      end
+    }
+  end
+
+  rule reset
+    "!"
+    {
+      def value
+        text_value
+      end
+    }
+  end
+
+  rule arpeggio
+    '@(' ([a-z] / [0-9ET#^_] / s )+ ')'
+    {
+      def value
+        text_value
+      end
+    }
+  end
+
+  rule multioctave
+    o:('^' / '_')+ s
+    {
+      def value
+        Thread.current[:topts][:octave] = o.elements.map {|v| (v.text_value=='^' ? 1 : -1)}.inject(0,:+)
+        o.text_value
+      end
+      def exact_value
+        "<"+o.elements.map {|v| (v.text_value=='^' ? 1 : -1)}.inject(0,:+).to_s+">"
+     end
+    }
+  end
+
+  rule ignore_params
+    '{' (([a-zA-Z0-9])+ ':' s? ([a-zA-Z0-9\-\.])+ ','? s?)+ '}'
+    {
+      def value
+        text_value
+      end
+    }
+  end
+
+  rule ignore_function
+    ':' [a-zA-Z]+ [a-zA-Z0-9_]* ('(' [a-zA-Z0-9\,\s\.]* ')')?
+    {
+      def value
+        text_value
+      end
+    }
+  end
+
+  rule ignore_comment
+    '<!' [a-zA-Z0-9_\-\s\n\r\|#+\-*]+ '>'
+    {
+      def value
+        text_value
+      end
+    }
+  end
+
+  rule anything
+    [\s\S]+
+    {
+      def value
+        nil
+      end
+    }
+  end
+
+  rule s
+      [\s\r\n]+
+      {
+        def value
+          nil
+        end
+      }
+  end
+
+  rule roman_number
+    [iv]+
+  end
+
+  rule roman
+    roman_number mode:([abcdefg])? rd:(roman_pick)? cd:(chord_name)? '*'? oct:([0-9])? inv:(inverse)?
+    {
+      def value
+       name = Thread.current[:tshared][:chord_name].to_sym if Thread.current[:tshared][:chord_name]
+       name = cd.value.to_sym if cd.methods.include?(:value)
+       roman = roman_number.text_value.to_sym
+       if !mode.empty?
+        cur_scale = mode_to_scale mode.text_value
+       else
+        cur_scale = Thread.current[:topts][:scale]
+        name = :major if cur_scale==:chromatic and !name # Ugly fix for chromatic scale
+       end
+        if name
+          root = degree roman, Thread.current[:topts][:key], cur_scale
+          shift = note_info(Thread.current[:topts][:key]).midi_note-60
+          notes = chord(root, name).notes
+          pcs = notes.map {|n| h = midi_to_pc(n-shift,Thread.current[:topts][:key], cur_scale); h[:prefix] = "<"+mode.text_value+">" if !mode.empty?; h }
+          pcs
+        else # TODO: This is not working for some scales ... but not really sure if this is even fixable.
+          pc_scale = (scale 0, cur_scale, num_octaves: 7).notes.to_a
+          trichords = (Scale.from_roman(roman)-1).step(pc_scale.size-1,2).map {|i| pc_scale[i]} # Select every 2nd
+          take_notes = (rd.methods.include?(:value) ? rd.value : 3)
+          chrom_pcs = trichords.take(take_notes)
+          pcs = chrom_pcs.map {|idx| pc_scale.index(idx) }
+          pcs = pcs.map {|p| h = get_ziff(p,Thread.current[:topts][:key], cur_scale); h[:prefix] = "<"+mode.text_value+">" if !mode.empty?; h }
+        end
+        v = {
+          :roman=>roman,
+          :hpcs=>pcs,
+          :key=>Thread.current[:topts][:key],
+          :scale=>cur_scale
+        }
+        v.merge!(Thread.current[:topts])
+        v[:subduration] = Thread.current[:tchordduration] if Thread.current[:tchordduration]
+        parsed_chord = ZiffHash[v]
+        parsed_chord.inv_chord! inv.value if inv.methods.include?(:value)
+        parsed_chord.multiply_chord_octaves!(oct.text_value.to_i) if !oct.text_value.empty?
+        parsed_chord
+      end
+    }
+  end
+
+  rule roman_pick
+    '+' i:([0-9]*)
+    {
+      def value
+        i.text_value.to_i
+      end
+    }
+  end
+
+  rule chord_name
+    '^' chord_name:([a-z0-9\+\-]+)
+    {
+      def value
+        chord_name.text_value
+      end
+    }
+  end
+
+  rule inverse
+    '%' inv:('-'? [0-9])
+    {
+      def value
+        inv.text_value.to_i
+      end
+    }
+  end
+
+  rule group
+    p:(pitch_classes) 2.. inv:(inverse)?
+    {
+     def value
+     e = p.elements.collect {|v| v.value }
+      if Thread.current[:tshared][:parse_chords]==nil or Thread.current[:tshared][:parse_chords]
+        c = ZiffHash[{hpcs: e, key: e[0][:key], scale: e[0][:scale]}]
+        c.inv_chord! inv.value if inv.methods.include?(:value)
+        c
+      else
+        e
+      end
+     end
+    }
+  end
+
+  rule normal_pitch_class
+    d:('-'? [0-9TE])
+    {
+      def value
+        parse_str_dgr(d.text_value)
+      end
+    }
+  end
+
+  rule multi_escape
+    '{' e:((random_decimal / random_between / decimal / integer / ' ')*) '}'
+    {
+      def value
+        e.elements.map {|v| v.text_value.strip.empty? ? v.text_value : "{"+(v.value || v.text_value).to_s+"}" }.join("")
+      end
+    }
+  end
+
+  rule escaped_eval
+    '{' e:((random_decimal / random_between / decimal / integer / '**' / '*' / '+' / '-' / '/' / '^' / '%' / '|' / '&' / '<<' / '>>' / '!' / '~')*) '}'
+    {
+      def value
+        v = e.elements.map {|v| v.methods.include?(:value) ? v.value : v.text_value }.join("")
+        eval(v)
+      end
+    }
+  end
+
+  rule eval
+    '={' e:((random_decimal / random_between / decimal / integer / '**' / '*' / '+' / '-' / '/' / '^' / '%' / '|' / '&' / '<<' / '>>' / '!' / '~')*) '}'
+    {
+      def value
+        v = e.elements.map {|v| v.methods.include?(:value) ? v.value : v.text_value }.join("")
+        eval(v)
+      end
+    }
+  end
+
+  rule random_pitch_class
+    '?'
+    {
+      def value
+        SonicPi::Core::SPRand.rand_i!(Thread.current[:topts][:scale] ? (scale 0, Thread.current[:topts][:scale]).length : 9)
+      end
+    }
+  end
+
+  rule random_percent
+    '%'
+      {
+        def value
+          sonic_random_float(0,1,3)
+        end
+      }
+  end
+
+  rule relative_duration
+    v:(min_max)? '%'
+    {
+      def value
+        (v and v.methods.include?(:value)) ? "#{v.value}%" : "%"
+      end
+    }
+  end
+
+  rule random_decimal
+    '(' m:(decimal) ',' x:(decimal) ')'
+      {
+        def value
+          sonic_random_float(m.value,x.value)
+        end
+      }
+  end
+
+  rule decimal
+    '-'? [0-9]* '.' [0-9]+
+    {
+      def value
+       text_value.to_f
+      end
+     }
+  end
+
+  rule integer
+    '-'? [0-9]+
+    {
+      def value
+        text_value.to_i
+      end
+    }
+  end
+
+  rule min_max
+    v:(integer / integer_array / random_between / cyclic_min_max)
+    {
+      def value
+      Thread.current[:tshared][:min_max_cycle_index] = (Thread.current[:tshared][:min_max_cycle_index] || 0) + 1
+      val = v.value
+      val = resolve_cycle(val,"M"+Thread.current[:tshared][:min_max_cycle_index].to_s) if val.is_a?(Hash) and val[:cycle]
+      val
+      end
+    }
+  end
+
+  rule cyclic_min_max
+  '<' first:(min_max) following:(' ' i:min_max)+ '>'
+    {
+    def value
+        r = following.elements.map {|v| v.i.value }
+        r.prepend(first.value)
+        {:cycle=>r}
+    end
+    }
+  end
+
+  rule min_max_list
+    first:(min_max) rest:(',' i:(min_max))*
+    {
+    def value
+      if rest.empty?
+        first.value
+      else
+        r = rest.elements.map {|v| v.i.value }
+        [r].prepend([first.value].flatten).flatten
+      end
+    end
+    }
+  end
+
+  rule ranges
+   a:(min_max) '..' b:(min_max) c:(step?)
+   {
+   def value
+     step = c.value if c.methods.include?(:value)
+     type = c.type if c.methods.include?(:type)
+     arr = sonic_range(a.value.to_i,b.value.to_i,step,type)
+     arr = arr.map {|v| ZiffHash[{pc: v}] }
+     ZiffArray[arr]
+   end
+   }
+  end
+
+  rule set_range
+    range:(set_ranges / set_index)
+    {
+      def value
+        range.value
+      end
+    }
+  end
+
+  rule set_ranges
+  '[' a:(min_max)? '..' b:(min_max)? ']'
+    {
+    def value
+      Range.new((a.methods.include?(:value) ? a.value.to_i : nil),(b.methods.include?(:value) ? b.value.to_i : nil))
+    end
+    }
+  end
+
+  rule set_index
+    '[' a:(min_max) ','? b:(min_max)? ']'
+    {
+      def value
+        r = [a.value]
+        r << b.value if b.methods.include?(:value)
+        r
+      end
+    }
+  end
+
+  rule random_between
+  '(' m:(min_max) ',' x:(min_max) ')'
+  {
+    def value
+      sonic_random(m.value,x.value)
+    end
+    def text_value
+      self.value.to_s
+    end
+  }
+end
+
+rule conditional_assingment
+  '{' conditional_set '}'
+  {
+    def value
+      eval_cond conditional_set.value
+    end
+    def eval_cond(tfunc)
+      if tfunc.is_a?(Hash)
+        cond = eval tfunc[:condition]
+        if cond
+          eval_cond tfunc[:if]
+        else
+          eval_cond tfunc[:else]
+        end
+      else
+        tfunc
+      end
+    end
+  }
+end
+
+rule conditional_set
+  cond:(condition) s? '?' s? first:(conditional_assingment / set / set_items) s? ':'? s? second:(conditional_assingment / set / set_items)?
+  {
+    def value
+      {
+      :condition => (cond.methods.include?(:value) ? cond.value : nil),
+      :if => (first.methods.include?(:value) ? first.value : nil),
+      :else => (second.methods.include?(:value) ? second.value : nil)
+      }
+    end
+  }
+end
+
+  rule ternary
+  '{' t:(conditional / clause) '}'
+    {
+      def value
+        t.value
+      end
+    }
+  end
+
+  rule conditional
+    cond:(condition) s? '?' s? first:(ternary / clause) s? ':'? s? second:(ternary / clause)?
+    {
+      def value
+        a = [(cond.methods.include?(:value) ? cond.value : nil), (first.methods.include?(:value) ? first.value : nil), (second.methods.include?(:value) ? second.value : nil)]
+        a
+      end
+    }
+  end
+
+  rule condition
+    (clause) comparison (clause)
+    {
+      def value
+        elements.map {|v| v.methods.include?(:value) ? v.value : v.text_value }.flatten.compact.join("")
+      end
+    }
+  end
+
+  rule comparison
+    ([<>!=] [=] 0..1)
+    {
+      def value
+        text_value
+      end
+    }
+  end
+
+  rule clause
+    first:(decimal / random_percent / mult_term / integer / integer_array / random_between / escaped_clause) rest:(op:operator cl:(decimal / random_percent / mult_term / integer / integer_array / random_between / escaped_clause))*
+    {
+      def value
+        if rest.empty?
+          first.value.to_s
+        else
+          r = rest.elements.map {|v| v.op.value+v.cl.value.to_s }
+          first.value.to_s+r.flatten.reject {|e| e.to_s.empty? }.join("")
+        end
+      end
+    }
+  end
+
+  rule escaped_clause
+    '(' clause ')'
+    {
+      def value
+      "("+clause.value.to_s+")"
+    end
+    }
+  end
+
+  rule mult_term
+    # TODO: Add i (index) as alternative value for x
+    a:(integer / integer_array / random_between)? b:('x')
+    {
+      def value
+        ret = a.methods.include?(:value) ? a.value.to_s+"*"+b.text_value : b.text_value
+        ret
+      end
+    }
+  end
+
+  rule operator
+    op:('**' / '*' / '+' / '-' / '/' / '^' / '%' / '|' / '&' / '<<' / '>>' / ')(')
+    {
+      def value
+        op.text_value==")(" ? ")*(" : text_value
+      end
+    }
+  end
+
+  rule step
+    op:('+' / [*] 1..2) min_max
+    {
+      def type
+        op.text_value
+      end
+      def value
+        val = min_max.value
+        val+=1 if val==0
+        val
+      end
+    }
+  end
+
+  rule integer_array
+    '[' first:(min_max) rest:(',' i:(min_max))+ ']'
+    {
+    def value
+      if rest.empty?
+        first.value
+      else
+        r = rest.elements.map {|v| v.i.value }
+        [r].prepend([first.value].flatten).flatten.pick(1)[0]
+      end
+    end
+    }
+  end
+
+  rule pitch_classes
+    prefix:(prefix_list)? d:(normal_pitch_class / escaped_eval / random_pitch_class / random_between / integer_array)
+    {
+      def value
+        prefixes = prefix.value.flatten.inject{|a,b| a.merge(b){|_,x,y| x + y}} if prefix.methods.include?(:value)
+        prefixes = {} if !prefixes
+
+        dgr = d.value
+
+        pc_scale = prefixes[:scale] ? prefixes[:scale] : Thread.current[:topts][:scale]
+        pc_key = Thread.current[:topts][:key]
+
+        v = {:pc=>dgr, :key=>pc_key, :scale=>pc_scale, :scale_length=>scale(pc_key,pc_scale).length-1}
+
+        v[:octave] = prefixes[:octave] if prefixes[:octave]
+        v[:prefix] = prefixes[:prefix] if prefixes[:prefix]
+        v[:add] = prefixes[:add] if prefixes[:add]
+
+        # Subduration is used here to store the multi_duration value. Sleep is not generally outputted to support things like [: <q;e> 0 2 :]
+        v[:subduration] = Thread.current[:topts][:duration] if Thread.current[:topts][:duration]
+
+        v[:generative] = true
+
+        if prefixes[:duration]
+          v[:duration] = prefixes[:duration]
+        end
+        ZiffHash[v]
+     end
+    }
+  end
+
+  rule prefix_list
+    (prefix_array / escaped_prefix_duration / prefix_octave / prefix_duration / octave / escaped_octave / add / dynamics / staccato / prefix_scale)*
+    {
+    def value
+      elements.map {|v| v.value }
+    end
+    }
+  end
+
+  rule prefix_scale
+    '<' s:([a-z_]+) '>'
+    {
+      def value
+          cur_scale = s.text_value
+          cur_scale = cur_scale.length<2 ? mode_to_scale(cur_scale) : cur_scale.to_sym
+          {prefix: text_value, scale: cur_scale}
+      end
+    }
+  end
+
+  rule prefix_array
+    '[' first:(prefix_list) rest:(',' i:(prefix_list))+ ']'
+    {
+    def value
+      if rest.empty?
+        first.value
+      else
+        r = rest.elements.map {|v| v.i.value }
+        r.prepend(first.value).pick.flatten
+      end
+    end
+    }
+  end
+
+  rule prefix_duration
+    s:([mklpdcwyhnqaefsxtgujz]) d:('.')*
+    {
+    def value
+        sum = Thread.current[:default_durs][s.text_value.to_sym]
+        sum = sum * (2.0-(1.0/(2*d.text_value.length))) if !d.text_value.empty?
+        {duration: sum}
+     end
+    }
+  end
+
+  rule escaped_prefix_duration
+  '<' decimal '>'
+  {
+    def value
+      {duration: decimal.value}
+    end
+   }
+  end
+
+  rule prefix_octave
+    o:('^' / '_')+
+    {
+      def value
+        {prefix: o.text_value }
+      end
+      def exact_value
+        octave_value = o.elements.map {|v| (v.text_value=='^' ? 1 : -1)}.inject(0,:+)
+        {prefix: "<"+octave_value.to_s+">", octave: octave_value }
+     end
+    }
+  end
+
+  rule slide
+    '~' v:(escaped_random / escaped_decimal)?
+    {
+      def value
+        "~" + (v.methods.include?(:value) ? v.value.to_s : "")
+     end
+    }
+  end
+
+  rule escaped_octave
+    '<' o:(integer) '>'
+    {
+      def value
+        octave_value = o.value
+        {prefix: text_value, octave: octave_value}
+      end
+    }
+  end
+
+  rule escaped_multi_octave
+    o:('<' val:(integer) '>') s
+    {
+      def value
+        Thread.current[:topts][:octave] = o.val.value
+        o.text_value
+      end
+    }
+  end
+
+  rule escaped_multi_scale
+    o:('<' sc:([a-z_]+) '>') s
+    {
+      def value
+        cur_scale = o.sc.text_value
+        cur_scale = cur_scale.length<2 ? mode_to_scale(cur_scale) : cur_scale.to_sym
+        Thread.current[:topts][:scale] = cur_scale
+        o.text_value
+      end
+    }
+  end
+
+  rule add
+    ('#' / 'b')
+    {
+      def value
+        {add: text_value=='#' ? 1 : -1}
+      end
+    }
+  end
+
+  rule dynamics
+    ('`' / '´')
+    {
+      def value
+        {prefix: text_value}
+      end
+    }
+  end
+
+  rule staccato
+    '\''
+    {
+      def value
+        {prefix: text_value}
+      end
+    }
+  end
+
+  rule bar
+     '|' {
+      def value
+       text_value
+     end
+     }
+   end
+
+   rule multi_duration
+     s:(duration)
+     {
+     def value
+       Thread.current[:topts][:duration] = s.value
+       s.text_value
+     end
+     }
+   end
+
+   rule duration
+     s:(zchar) d:('.')*
+     {
+     def value
+         sum = s.value
+         sum = sum * (2.0-(1.0/(2*d.text_value.length))) if !d.text_value.empty?
+         sum
+      end
+     }
+   end
+
+   rule decimal_duration
+     s:(decimal)
+     {
+     def value
+         Thread.current[:topts][:duration] = s.value
+         s.value
+      end
+     }
+   end
+
+   rule zchar
+   s:([mklpdcwyhnqaefsxtgujz]+)
+   {
+     def value
+       sum = s.text_value.split('').inject(0){|sum,x| sum + Thread.current[:default_durs][x.to_sym]}
+       sum.to_f
+    end
+   }
+   end
+
+end

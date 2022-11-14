@@ -1,0 +1,3 @@
+[submodule "sonicpi/ziffers"]
+	path = sonicpi/ziffers
+	url = https://github.com/amiika/ziffers.git

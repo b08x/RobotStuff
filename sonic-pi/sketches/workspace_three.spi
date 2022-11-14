@@ -1,0 +1,16 @@
+#@notes = (ring :b2, :e2, :e3, :a2, :d3, :a2, :d2, :a2, :c3, :c2, :b2, :c2, :b2, :a2, :e2, :a2)
+@notes = (ring :A2, :E2, :E3, :A2, :D3, :A2, :D2, :A2, :C3, :C2, :A2, :C2, :B2, :A2, :E2, :A2)
+
+use_octave 0
+use_synth :bass_foundation
+def intro
+  
+  live_loop :intro do
+    midi @notes.tick, channel: 3, velocity: 70, velocity_f: 72, sustain: 1
+    sleep 1
+  end
+  
+end
+
+intro
+

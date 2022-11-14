@@ -1,0 +1,603 @@
+grammar Ziffers
+
+  rule line
+    (s / comment / opt_list / continue / bar / relative_duration / multi_duration / multi_scale / arpeggio / chords / pitch_classes / control / multiuse / use / multi_escaped_opts / fixed_octave / numeric_octave / call / eval / rest / slide / reset / skip)*
+    {
+      def value
+        e = elements.collect {|v| v.value }.flatten.compact
+      end
+    }
+  end
+
+  rule opt_list
+    p:(escaped_opts / prefix_duration)? '(' line ')'
+    {
+      def value
+        list_opts = p.value if !p.empty?
+        line.elements.collect {|v| val = v.value ; val ? (list_opts ? val.merge(list_opts) : val) : nil }.flatten.compact
+      end
+    }
+  end
+
+  rule fixed_octave
+    o:([\^\_]+) (s / duration)
+    {
+    def value
+      Thread.current[:topts][:octave] = 0 if !Thread.current[:topts][:octave]
+      Thread.current[:topts][:octave] += o.text_value.split('').inject(0){|sum,x| sum + (x=='^' ? 1 : -1)}
+      nil
+    end
+    }
+  end
+
+  rule numeric_octave
+    '<' o:(integer) '>' (s / duration)
+    {
+      def value
+        Thread.current[:topts][:octave] = o.value
+        nil
+      end
+    }
+  end
+
+  rule relative_duration
+    d:(integer)? '%'
+    {
+    def value
+      Thread.current[:topts][:relative_duration_value] = (d.value.to_f/100).round(2) if d and d.methods.include?(:value)
+      Thread.current[:topts][:relative_duration] = true
+      nil
+    end
+    }
+  end
+
+  rule multi_duration
+    duration ![0-9a-zA-Z_\^#<]
+    {
+    def value
+      Thread.current[:topts][:duration] = duration.value
+      Thread.current[:topts][:relative_duration] = false if Thread.current[:topts][:relative_duration]
+      nil
+    end
+    }
+  end
+
+  rule duration
+    s:(zchar / decimal) negation:('-')? d:('.')*
+    {
+    def value
+        sum = s.value
+        sum = sum * (2.0-(1.0/(2*d.text_value.length))) if !d.text_value.empty?
+        sum = s.value-(sum-s.value) if !negation.text_value.empty?
+        sum
+     end
+    }
+  end
+
+  rule zchar
+  s:([mklpdcwyhnqaefsxtgujz]+)
+  {
+    def value
+      sum = s.text_value.split('').inject(0){|sum,x| sum + Thread.current[:default_durs][x.to_sym]}
+      sum.to_f
+   end
+  }
+  end
+
+  rule arpeggio
+    '@(' a:(duration / s / chords / pitch_classes)* ')'
+    {
+     def value
+      #chord_list = n.elements.collect {|v| v.value }.filter_map {|v| v if v}
+
+      arp = a.elements.collect {|v| v.value }.filter_map do |v|
+        if v then
+          if v.is_a?(Float)
+              Thread.current[:topts][:duration] = v
+              nil
+          else
+            v.merge!(Thread.current[:topts]) if v.is_a?(Hash)
+            v
+          end
+        end
+      end
+      Thread.current[:tarp] = arp.length>0 ? arp : nil
+      nil
+     end
+    }
+  end
+
+  rule chords
+     pitch_classes 2..
+    {
+     def value
+      e = elements.collect {|v| v.value }
+      pitch_class_list = []
+      note_list = []
+      octave_list = []
+      e.each do |d|
+        pitch_class_list.push(d[:pc])
+        note_list.push(d[:note])
+        octave_list.push(d[:octave])
+      end
+      v = {:notes=>note_list, :pcs=>pitch_class_list, :hpcs=>e, :octaves=>octave_list}
+      v.merge!(Thread.current[:topts])
+      v[:amp] = e[0][:amp] if e[0][:amp]
+      if Thread.current[:tchordduration]
+        v[:duration] = Thread.current[:tchordduration]
+      else
+        v[:duration] = e[0][:duration] if e[0][:duration]
+      end
+      v[:beats] = v[:duration]*4.0
+      v[:arpeggio] = Thread.current[:tarp] if Thread.current[:tarp]
+      v = ZiffHash[v]
+      v.update_ADSR!
+      if !Thread.current[:tshared][:normalized]
+        v = apply_transformation v, Thread.current[:tshared], 0, Thread.current[:counter]
+        Thread.current[:counter] = Thread.current[:counter]+1
+      end
+      v
+     end
+    }
+  end
+
+  rule call
+    prefix:(prefix_duration)* method_call
+    {
+      def value
+        v = {method: method_call.value }.merge!(Thread.current[:topts])
+        prefixes = prefix.elements.map {|v| v.value}.inject{|a,b| a.merge(b){|_,x,y| x + y}}
+
+        if prefixes and prefixes[:duration]
+          v[:duration] = prefixes[:duration]
+          v[:beats] = v[:duration]*4.0
+        end
+
+        ZiffHash[v]
+      end
+    }
+  end
+
+  rule method_call
+    ':' val:([a-zA-Z]+ [a-zA-Z0-9_]* ('(' [a-zA-Z0-9\,\s\.]* ')')?)
+    {
+      def value
+        val.text_value
+      end
+    }
+  end
+
+  rule comment
+    '<!' [a-zA-Z0-9_\-\s\n\r\|#+\-*]+ '>'
+    {
+      def value
+        nil
+      end
+    }
+  end
+
+  rule multi_escaped_opts
+    e:(escaped_opts)
+    {
+    def value
+      h = e.value
+      Thread.current[:topts] = Thread.current[:topts].merge(h)
+      nil
+    end
+    }
+  end
+
+  rule escaped_opts
+    '{' s? opts:(key:([a-zA-Z0-9]+) ':' s? val:([a-zA-Z0-9\-\.]+) ','? s?)+ '}'
+    {
+    def value
+      h = Hash[*opts.elements.map {|p| [p.key.text_value.to_sym,cast_to_type(p.val.text_value)] }.flatten]
+      h
+    end
+    def cast_to_type val
+        begin
+          val.to_i if Integer(val)
+        rescue ArgumentError
+          begin
+           val.to_f if Float(val)
+          rescue ArgumentError
+           val.to_s
+          end
+      end
+    end
+    }
+  end
+
+  rule normal_pitch_class
+    d:('-'? [0-9TE])
+    {
+      def value
+        parse_str_dgr(d.text_value)
+      end
+    }
+  end
+
+  rule pitch_classes
+    prefix:(escaped_prefix_duration / prefix_duration / octave / escaped_octave / add / dynamics / staccato / prefix_scale)* some_pitch_class:(normal_pitch_class / eval)
+    {
+      def value
+        dgr = some_pitch_class.value
+
+        prefixes = prefix.elements.map {|v| v.value}
+        # Filter scales
+        prefix_scales, prefixes = prefixes.partition {|v| v[:prefix_scale] }
+        pc_scale = prefix_scales[0][:prefix_scale] if prefix_scales and prefix_scales[0]
+        # Sum other prefixes
+        prefixes = prefixes.inject{|a,b| a.merge(b){|_,x,y| x + y}}
+        prefixes = {} if !prefixes
+
+        # Midi and channel parse hacks
+        if (Thread.current[:topts][:midi] || Thread.current[:topts][:parse_cc])
+          v = {note: dgr, pc: note_pc(dgr), octave: note_oct(dgr), scale: :chromatic }
+        elsif Thread.current[:tshared][:multi]
+          v = {pc: dgr, scale: :chromatic, channel: (dgr==0 ? dgr+1 : dgr)}
+          if Thread.current[:tshared][:multi].is_a? Array
+            v[:note] = Thread.current[:tshared][:multi][(dgr-1)%Thread.current[:tshared][:multi].length] || 60
+          elsif Thread.current[:tshared][:multi].is_a? Hash
+            v[:note] = (Thread.current[:tshared][:multi][dgr] || 60)
+          else
+            v[:note] = 60 # Default in multi channel mode
+          end
+        else # Normal parsing
+          if prefixes[:fixed_octave]
+            oct = prefixes[:fixed_octave]
+          else
+            oct = prefixes[:octave] ? prefixes[:octave] : 0
+            oct = oct + Thread.current[:topts][:octave] if Thread.current[:topts][:octave]
+          end
+          addition = prefixes[:add] ? prefixes[:add] : 0
+          v = get_ziff dgr, Thread.current[:topts][:key], (pc_scale ? pc_scale :  Thread.current[:topts][:scale]), oct, addition, (Thread.current[:tshared][:semitones] ? Thread.current[:tshared][:semitones] : 1)
+        end
+
+        v.merge!(Thread.current[:topts]) { |key, important, default| important }
+        v[:amp] = v[:amp] ? v[:amp]+(v[:amp]/2)*prefixes[:dynamics] : (prefixes[:dynamics]<0 ? 1.0/-(prefixes[:dynamics]-1) : 1.0+0.5*prefixes[:dynamics])  if prefixes[:dynamics]
+
+        if prefixes[:duration]
+          v[:duration] = prefixes[:duration]
+          v.delete(:relative_duration)
+        else
+          opt_duration = Thread.current[:topts][:duration]
+          v[:duration] = opt_duration.is_a?(Numeric) ? opt_duration : 0.25
+        end
+
+        v[:release] = ((v[:duration]/(prefixes[:staccato]+2))+(v[:duration]/((prefixes[:staccato]+2))))/v[:duration] if prefixes[:staccato]
+
+        v[:beats] = v[:duration]*4.0
+
+        Thread.current[:topts].delete(:relative_duration_value)
+
+        v = ZiffHash[v]
+        v.update_ADSR!
+        if !Thread.current[:tshared][:normalized] # If directly from zparse
+          v = apply_transformation v, Thread.current[:tshared], 0, Thread.current[:counter]+(Thread.current[:tshared][:loop_i] ? Thread.current[:tshared][:loop_i] : 0)
+          Thread.current[:counter] = Thread.current[:counter]+1
+        end
+
+        v
+     end
+    }
+  end
+
+  rule prefix_duration
+    s:([mklpdcwyhnqaefsxtgujz]) d:('.')*
+    {
+    def value
+        sum = Thread.current[:default_durs][s.text_value.to_sym]
+        sum = sum * (2.0-(1.0/(2*d.text_value.length))) if !d.text_value.empty?
+        {duration: sum}
+     end
+    }
+  end
+
+  rule prefix_scale
+    '<' e:([a-z_]+) '>'
+    {
+      def value
+          {prefix_scale: e.text_value.length==1 ? mode_to_scale(e.text_value).to_sym : e.text_value.to_sym}
+      end
+    }
+  end
+
+  rule escaped_prefix_duration
+  '<' decimal '>'
+  {
+    def value
+      {duration: decimal.value}
+    end
+   }
+  end
+
+  rule multi_scale
+    '<' e:([a-z_]+) '>' s
+    {
+      def value
+          val = e.text_value.length==1 ? mode_to_scale(e.text_value).to_sym : e.text_value.to_sym
+          Thread.current[:topts][:scale] = val
+          nil
+      end
+    }
+  end
+
+  rule octave
+    ('^' / '_')
+    {
+      def value
+        {octave: (text_value=='^' ? 1 : -1) }
+     end
+    }
+  end
+
+  rule escaped_octave
+    '<' o:(integer) '>'
+    {
+      def value
+        {fixed_octave: o.value}
+      end
+    }
+  end
+
+  rule add
+    ('#' / 'b')
+    {
+      def value
+        {add: text_value=='#' ? 1 : -1}
+      end
+    }
+  end
+
+  rule dynamics
+    ('`' / '´')
+    {
+      def value
+        {dynamics: text_value=='´' ? 1 : -1}
+      end
+    }
+  end
+
+  rule staccato
+    '\''
+    {
+      def value
+        {staccato: 1}
+      end
+    }
+  end
+
+  rule multiuse
+    use 2..
+      {
+      def value
+        items = elements.collect {|v| v.value }.compact
+        raise "No samples or lambas defined for A-Z" if items.length==0
+        chars = items.map {|s| s[:char]}
+        samplelist = items.filter {|h| h[:sample]}
+        notelist = items.filter {|h| h[:note]}
+        if samplelist.length>0 # TODO: How about both. Not supported at the moment.
+          hash = {samples: samplelist, chars: chars, duration: samplelist[0][:duration], beats: samplelist[0][:beats] }
+        else
+          hash = {hpcs: notelist, chars: chars, duration: notelist[0][:duration], beats: notelist[0][:beats], notes: notelist.map{|h| h[:note]}}
+        end
+        ZiffHash[hash]
+      end
+    }
+  end
+
+  rule use
+     prefix:(prefix_duration / escaped_prefix_duration / octave / add / dynamics / staccato)* u:[ABCDFGHIJKLMNOPQRSUWXYZO]
+    {
+    def value
+      use_list = Thread.current[:tshared][:use] if Thread.current[:tshared] and Thread.current[:tshared].has_key?(:use)
+
+        if use_list
+          prefixes = prefix.elements.map {|v| v.value}.inject{|a,b| a.merge(b){|_,x,y| x + y}}
+          prefixes = {} if !prefixes
+
+          Thread.current[:topts][:run_each] = use_list[:run] if use_list[:run]
+
+          v = use_list.has_key?(u.text_value.to_sym) ? use_list[u.text_value.to_sym].dup : nil
+
+          return nil if !v
+
+          if v.is_a?(Hash)
+            Thread.current[:topts][:run_each] = v.delete(:run) if v[:run] and !v[:sample] and !v[:note]
+            v[:run_each] = v.delete(:run) if v[:run] and v[:sample]
+            v = apply_transformation(v, v[:apply] ? v[:apply] : {apply: v.except(:sample)})
+          elsif v.is_a?(Symbol)
+            v = {sample: v}
+          elsif v.is_a?(Proc)
+            v = {method: v}
+          end
+
+          v.merge!(Thread.current[:topts]) { |key, important, default| important }
+
+          if prefixes[:duration]
+            v[:duration] = prefixes[:duration]
+            v.delete(:relative_duration)
+          else
+            opt_duration = Thread.current[:topts][:duration]
+            v[:duration] = opt_duration.is_a?(Numeric) ? opt_duration : 0.25
+          end
+
+          v[:beats] = v[:duration]*4.0
+
+          if v.has_key?(:cue)
+            v[:duration] = 0.0
+            v[:beats] = 0.0
+            v.delete(:relative_duration)
+          end
+
+          Thread.current[:topts].delete(:relative_duration_value)
+
+          v[:amp] = v[:amp] ? v[:amp]+(v[:amp]/2)*prefixes[:dynamics] : (prefixes[:dynamics]<0 ? 1.0/-(prefixes[:dynamics]-1) : 1.0+0.5*prefixes[:dynamics])  if prefixes[:dynamics]
+
+          if prefixes[:octave]
+            v[:pitch] = 0.0 if !v[:pitch]
+            v[:pitch] += prefixes[:octave]*12 if prefixes[:octave]
+          else
+            v[:pitch] = v[:pitch] ? v[:pitch]+Thread.current[:topts][:octave] : Thread.current[:topts][:octave] if Thread.current[:topts][:octave]
+          end
+
+          v[:pitch] = v[:pitch] ? v[:pitch]+Thread.current[:topts][:add] : Thread.current[:topts][:add] if prefixes[:add]
+          v[:pitch_stretch] = ((v[:duration]/(prefixes[:staccato]+2))+(v[:duration]/((prefixes[:staccato]+2))))/v[:duration] if v[:duration] and prefixes[:staccato]
+          v[:char] = u.text_value
+
+          ZiffHash[v]
+        else
+          nil
+        end
+    end
+    }
+  end
+
+  rule eval
+    '{' e:((decimal / integer / '**' / '*' / '+' / '-' / '/' / '^' / '%' / '|' / '&' / '<<' / '>>' / '!' / '~')*) '}'
+    {
+      def value
+        eval(e.text_value)
+      end
+    }
+  end
+
+  rule rest
+  s:(duration)? 'r'
+  {
+    def value
+      v = {note: :r}
+      v[:duration] = s.methods.include?(:value) ? s.value : Thread.current[:topts][:duration]
+      v[:beats] = v[:duration]*4.0
+      ZiffHash[v]
+   end
+  }
+  end
+
+  rule reset
+    '!'
+    {
+    def value
+      Thread.current[:topts] = Marshal.load(Marshal.dump(Thread.current[:topts_orig]))
+      nil
+    end
+    }
+  end
+
+  rule control
+   d:([ABCDFGHIJKMNOPQRSUWXY]) c:(integer / escaped_decimal / escaped_text)
+   {
+     def value
+     control_chars = {
+       'A': :amp,
+       'B': :attack,
+       'P': :pan,
+       'D': :decay,
+       'S': :sustain,
+       'R': :release,
+       'X': :chord_duration,
+       'I': :pitch,
+       'K': :key,
+       'L': :scale,
+       'C': :channel
+     }
+      control_type = control_chars[d.text_value.to_sym]
+      Thread.current[:topts][control_type] = c.value if c.methods.include?(:value)
+      nil
+     end
+    }
+end
+
+  rule decimal
+    '-'? [0-9]+ '.' [0-9]+
+    {
+      def value
+       text_value.to_f
+      end
+     }
+  end
+
+  rule slide
+  '~' e:( '<' v:([0-9]+ '.' [0-9]+) '>')? s? c:(chords)
+    {
+      def value
+      cho = ZiffHash[c.value.merge!(Thread.current[:topts])]
+        v = {
+          :slide=>cho,
+          :duration=>cho[:duration]*cho[:pcs].length,
+          :beats=>(cho[:duration]*cho[:pcs].length)*4
+        }
+        v.merge!(Thread.current[:topts])
+        v[:note_slide] = e.v.text_value.to_f if !e.empty?
+        ZiffHash[v]
+      end
+    }
+  end
+
+  rule escaped_decimal
+  '<' decimal '>'
+  {
+    def value
+      decimal.value
+    end
+   }
+  end
+
+  rule escaped_text
+   '<' e:([\sa-zA-Z0-9:-]*) '>'
+   {
+     def value
+      e.text_value
+     end
+    }
+  end
+
+  rule continue
+    '...'
+    {
+    def value
+     nil
+    end }
+  end
+
+  rule integer
+     '-'? [0-9]+ {
+     def value
+      text_value.to_i
+     end }
+  end
+
+  rule s
+     [\s\r\n]+
+     {
+     def value
+      nil
+    end
+    }
+  end
+
+  rule skip
+    '# '
+    {
+    def value
+      Thread.current[:topts][:skip] = Thread.current[:topts][:skip] ? false : true
+      nil
+    end
+  }
+  end
+
+  rule bar
+     '|' {
+       def value
+          Thread.current[:topts].except!(:skip)
+          Thread.current[:topts][:octave] = 0
+          Thread.current[:topts][:duration] = Thread.current[:topts_orig][:duration] ? Thread.current[:topts_orig][:duration] : 0.25
+          Thread.current[:topts][:measure] = !Thread.current[:topts][:measure] ? 0 : Thread.current[:topts][:measure] += 1
+          Thread.current[:topts][:relative_duration] = false if Thread.current[:topts][:relative_duration]
+          Thread.current[:topts].delete(:relative_duration_value)
+          nil
+        end
+      }
+  end
+end
