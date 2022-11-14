@@ -1,0 +1,90 @@
+local mainInput = Audio.Input("main_input")
+
+local combSplitter = Lv2.Plugin("http://plugin.org.uk/swh-plugins/combSplitter")
+combSplitter.control("freq", 172.0)
+
+local scapeDelay = Lv2.Plugin("http://moddevices.com/plugins/caps/Scape")
+scapeDelay.control("bpm", 100.0)
+scapeDelay.control("div", 3.0)
+scapeDelay.control("feedback", 0.25)
+scapeDelay.control("q", 0.75)
+scapeDelay.control("blend", 0.5)
+
+local fad = Lv2.Plugin("http://plugin.org.uk/swh-plugins/fadDelay")
+fad.control("delay", 1.0)
+fad.control("fb_db", -10.0)
+
+local monoDynamics = Lv2.Plugin("http://moddevices.com/plugins/tap/dynamics")
+monoDynamics.control("attack", 128.000000)
+monoDynamics.control("release", 502.000000)
+monoDynamics.control("offset", 0.000000)
+monoDynamics.control("makeup", 0.000000)
+monoDynamics.control("function", 12.000000)
+
+
+local revDelay = Lv2.Plugin("http://plugin.org.uk/swh-plugins/revdelay")
+revDelay.control("delay_time", 0.25)
+revDelay.control("dry_level", 0.000000)
+revDelay.control("wet_level", 0.000000)
+revDelay.control("feedback", 0.10)
+revDelay.control("xfade_samp", 1250.000000)
+
+local bodeShifter = Lv2.Plugin("http://plugin.org.uk/swh-plugins/bodeShifter")
+bodeShifter.control("shift", 2500.0) // 0.0 - 5000.0
+
+
+// local mono_to_stereo = Lv2.Plugin("http://plugin.org.uk/swh-plugins/split")
+
+mainInput => combSplitter
+
+combSplitter.output[0] -> fad.input[0]
+combSplitter.output[1] -> scapeDelay.input[0]
+
+fad.output[0] -> monoDynamics.input[0]
+scapeDelay.output[0] -> revDelay.input[0]
+
+revDelay.output[0] -> bodeShifter.input[0]
+// monoDynamics.output[0] -> fractalDoubler.input[0]
+
+local mixer = Audio.Mixer(4, 2)
+
+mixer.add()
+mixer.add(bodeShifter)
+
+local output = Audio.StereoOutput("main_output")
+
+mixer => output
+
+
+function ratio2db(min, ratio) { return min * Math.log10(ratio) }
+
+local port = 3034
+local oscInput = Osc.Input(port)
+print("listening on port " + port + "..\n")
+
+oscInput.onReceive(function(message) {
+  switch(message.path) {
+	case "/fad/delay":
+		local delay = message.arg(0)
+		println(delay)
+		fad.control("delay", delay)
+		break;
+	case "/fad/feedback":
+		local feedback = message.arg(0)
+    	
+		if(feedback <= 0.1) { feedback = -70.0 }
+    	if(feedback > 0.0) { feedback = ratio2db(70,feedback) }
+		
+		println(feedback)
+		fad.control("fb_db", feedback)
+		
+		break;
+
+
+    default:
+		println("warning: unknown message path " + message.path)
+	}
+})
+
+
+Script.stayAlive()

@@ -1,0 +1,24 @@
+function ratio2db(ratio) { return 70 * Math.log10(ratio) }                                                                   
+                                                                                                                             
+function db2ratio(db) { return Math.pow(10, db / 20.0) }                                                                     
+
+function cc2ratio(cc) { return cc / 127.0 }
+
+//440.0 * (2 ** ((n - 69) / 12.0))
+
+function midi2hz(m) { 
+	return Math.pow(2, (m - 69) / 12.0) * 440.0 * 1.593
+}                                                                    
+
+//print(midi2hz(62))
+                                                         
+local gain = 0.8                                                                                                           
+print("gain ratio of " + gain + " = ")                                                                                       
+print(ratio2db(gain) + " dBFS\n")   
+
+local dBFS = 42.0
+print("dBFS of " + dBFS + " = ")
+println(db2ratio(dBFS))
+
+local cc = 127
+println(cc2ratio(cc))

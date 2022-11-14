@@ -1,0 +1,43 @@
+local mainInput = Audio.Input("main_input")
+
+
+local fad = Lv2.Plugin("http://plugin.org.uk/swh-plugins/fadDelay")
+
+fad.control("delay", 1.0)
+fad.control("fb_db", -10.0)
+
+local mono_to_stereo = Lv2.Plugin("http://plugin.org.uk/swh-plugins/split")
+
+local output = Audio.StereoOutput("main_output")
+
+mainInput => fad => mono_to_stereo => output
+
+function ratio2db(min, ratio) { return min * Math.log10(ratio) }
+
+local port = 3034
+local oscInput = Osc.Input(port)
+print("listening on port " + port + "..\n")
+
+oscInput.onReceive(function(message) {
+  switch(message.path) {
+	case "/fad/delay":
+		local delay = message.arg(0)
+		println(delay)
+		fad.control("delay", delay)
+		break;
+	case "/fad/feedback":
+		local feedback = message.arg(0)
+    if(feedback <= 0.1) { feedback = -70.0 }
+    if(feedback > 0.0) { feedback = ratio2db(70,feedback) }
+		println(feedback)
+		fad.control("fb_db", feedback)
+		break;
+
+
+    default:
+		println("warning: unknown message path " + message.path)
+	}
+})
+
+
+Script.stayAlive()

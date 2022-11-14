@@ -1,0 +1,20 @@
+midiInput <- Midi.Input("myinput")
+
+synth <- Lv2.Plugin("http://calf.sourceforge.net/plugins/Monosynth")
+
+midiInput => synth
+
+effect <- Lv2.Plugin("http://calf.sourceforge.net/plugins/Reverb")
+
+synth => effect
+
+mainOutput <- Audio.StereoOutput("main", true)
+
+effect => mainOutput
+
+midiInput => synth => effect => mainOutput
+
+synth.output[0] -> effect.input[1]
+synth.output[1] -> effect.input[0]
+
+Script.stayAlive()

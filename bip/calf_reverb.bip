@@ -1,0 +1,151 @@
+/* osc control for calf reverb */
+
+local reverb = Lv2.Plugin("http://calf.sourceforge.net/plugins/Reverb")
+
+/*
+Minimum:     0.000000
+Maximum:     2.000000
+Default:     0.250000 */
+reverb.control("amount", 0.25)
+
+/*
+Minimum:     0.000000
+Maximum:     2.000000
+Default:     1.000000 */
+reverb.control("dry", 1.0)
+
+/* Scale Points:
+	4 = "Large/smooth"
+	5 = "Experimental"
+	0 = "Small"
+	1 = "Medium"
+	2 = "Large"
+	3 = "Tunnel-like"
+Minimum:     0.000000
+Maximum:     5.000000
+Default:     2.000000 */
+reverb.control("room_size", 1.0)
+
+/*
+Minimum:     0.400000
+Maximum:     15.000000
+Default:     1.500000 */
+reverb.control("decay_time", 1.5)
+
+/*
+Minimum:     2000.000000
+Maximum:     20000.000000
+Default:     5000.000000 */
+reverb.control("hf_damp", 5000.0)
+
+/*
+Minimum:     20.000000
+Maximum:     20000.000000
+Default:     300.000000 */
+reverb.control("bass_cut", 100.0)
+
+/*
+Minimum:     20.000000
+Maximum:     20000.000000
+Default:     5000.000000 */
+reverb.control("treble_cut", 10000.0)
+
+/*
+Minimum:     0.000000
+Maximum:     1.000000
+Default:     1.000000 */
+reverb.control("on", 1.0)
+
+local mainInput = Audio.StereoInput("main_input", false)
+
+
+mainInput => reverb => Audio.StereoOutput("main_output", false)
+
+
+function midi2hz(m) {
+	return Math.pow(2, (m - 69) / 12.0) * 440.0 * 1.593
+}
+
+local port = 3035
+local oscInput = Osc.Input(port)
+print("listening on port " + port + "..\n")
+
+oscInput.onReceive(function(message) {
+  switch(message.path) {
+		case "/reverb/bypass":
+			local bypass = message.arg(0)
+			println(bypass)
+			reverb.control("on", bypass)
+			break;
+		case "/reverb/dry":
+			local dry = message.arg(0)
+			println(dry)
+			reverb.control("dry", dry)
+			break;
+		case "/reverb/wet":
+			local wet = message.arg(0)
+			println(wet)
+			reverb.control("amount", wet)
+			break;
+		case "/reverb/room_size":
+			local room_size = message.arg(0)
+			println(room_size)
+			reverb.control("room_size", room_size)
+			break;
+		case "/reverb/decay_time":
+			local decay_time = message.arg(0)
+			println(decay_time)
+			reverb.control("decay_time", decay_time)
+			break;
+		case "/reverb/hf_damp":
+			local hf_damp = message.arg(0)
+			println(hf_damp)
+			reverb.control("hf_damp", hf_damp)
+			break;
+		case "/reverb/bass_cut":
+			local bass_cut = message.arg(0)
+			println(bass_cut)
+			reverb.control("bass_cut", bass_cut)
+			break;
+		case "/reverb/treble_cut":
+			local treble_cut = message.arg(0)
+			println(treble_cut)
+			reverb.control("treble_cut", treble_cut)
+			break;
+
+    default:
+		println("warning: unknown message path " + message.path)
+  }
+})
+
+
+/* local controller = Midi.Input("reverbControl")
+
+controller.onControl(function(cc, m) {
+
+	if(cc.controller == 27) {
+		println("bypass " + cc.value)
+		reverb.control("on", cc.value)
+
+	} else if(cc.controller == 28) {
+		local dry_level = Math.log10(cc.value)
+		println("dry " + dry_level)
+		reverb.control("dry", dry_level)
+
+	} else if(cc.controller == 29) {
+		local wet_level = Math.log10(cc.value)
+		println("amount " + wet_level)
+		reverb.control("amount", wet_level)
+
+	} else if(cc.controller == 30) {
+		local damp = midi2hz(cc.value)
+
+		if(damp <= 1999.0) { damp = 2000.0 }
+
+		println("hf_damp " + damp)
+		reverb.control("hf_damp", damp)
+	}
+
+}) */
+
+Script.stayAlive()

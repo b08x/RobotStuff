@@ -1,0 +1,202 @@
+local Sub = Audio.Input("Sub")
+local Mid = Audio.StereoInput("Mid", false)
+local High = Audio.StereoInput("High", false)
+
+local compressorSub = Lv2.Plugin("http://plugin.org.uk/swh-plugins/sc1")
+compressorSub.control("attack", 101.5)
+compressorSub.control("release", 401.0)
+compressorSub.control("threshold", -20.0)
+compressorSub.control("ratio", 2.0)
+compressorSub.control("knee", 0.5)
+compressorSub.control("makeup_gain", 0.0)
+
+local mono_to_stereo = Lv2.Plugin("http://plugin.org.uk/swh-plugins/split")
+
+Sub => compressorSub => mono_to_stereo
+
+
+local compressorMid = Lv2.Plugin("http://plugin.org.uk/swh-plugins/sc4")
+compressorMid.control("rms_peak", 1.0)
+compressorMid.control("attack", 101.5)
+compressorMid.control("release", 401.0)
+compressorMid.control("threshold", -20.0)
+compressorMid.control("ratio", 2.0)
+compressorMid.control("knee", 1.0)
+compressorMid.control("makeup_gain", 0.0)
+
+Mid => compressorMid
+
+local compressorHigh = Lv2.Plugin("http://plugin.org.uk/swh-plugins/sc4")
+compressorHigh.control("rms_peak", 1.0)
+compressorHigh.control("attack", 101.5)
+compressorHigh.control("release", 401.0)
+compressorHigh.control("threshold", -20.0)
+compressorHigh.control("ratio", 2.0)
+compressorHigh.control("knee", 1.0)
+compressorHigh.control("makeup_gain", 0.0)
+
+High => compressorHigh
+
+local mixer = Audio.Mixer(6, 2)
+
+mixer.add(mono_to_stereo)
+mixer.add(compressorMid)
+mixer.add(compressorHigh)
+
+local eq = Lv2.Plugin("http://plugin.org.uk/swh-plugins/dj_eq")
+
+eq.control("lo", 0.0)
+eq.control("mid", 0.0)
+eq.control("hi", 0.0)
+
+local output = Audio.StereoOutput("main_output", false)
+
+mixer => eq => output
+
+
+// local oscOutput = Osc.Output("localhost", 8060)
+
+
+function ratio2db(min, ratio) { return min * Math.log10(ratio) }
+
+local oscInput = Osc.Input(3033)
+local oscOutput = Osc.Output("localhost", 8060)
+
+println("listening on port 3033")
+
+oscInput.onReceive(function(message) {
+  switch(message.path) {
+    case "/sub/sc1/attack":
+      local attack = message.arg(0)
+      println(attack)
+      compressorSub.control("attack", attack)
+// todo: send osc message back to touchosc with current value
+// oscOutput.send(Osc.Message"/attack_value").add("hey")
+      break;
+    case "/sub/sc1/release":
+      local release = message.arg(0)
+      println(release)
+      compressorSub.control("release", release)
+      break;
+    case "/sub/sc1/threshold":
+      local threshold = message.arg(0)
+	    if(threshold <= 0.1) { threshold = -30.0 }
+	    if(threshold > 0.0) { threshold = ratio2db(30,threshold) }
+      println(threshold)
+      compressorSub.control("threshold", threshold)
+      break;
+    case "/sub/sc1/ratio":
+      local ratio = message.arg(0)
+      println(ratio)
+      compressorSub.control("ratio", ratio)
+      break;
+    case "/sub/sc1/knee":
+      local knee = message.arg(0)
+      println(knee)
+      compressorSub.control("knee", knee)
+      break;
+    case "/sub/sc1/makeup_gain":
+      local makeup_gain = message.arg(0)
+      println(makeup_gain)
+      compressorSub.control("makeup_gain", makeup_gain)
+      break;
+
+    case "/mid/sc4/attack":
+      local attack = message.arg(0)
+      println(attack)
+      compressorMid.control("attack", attack)
+      break;
+    case "/mid/sc4/release":
+      local release = message.arg(0)
+      println(release)
+      compressorMid.control("release", release)
+      break;
+    case "/mid/sc4/threshold":
+      local threshold = message.arg(0)
+	    if(threshold <= 0.1) { threshold = -30.0 }
+	    if(threshold > 0.0) { threshold = ratio2db(30,threshold) }
+      println(threshold)
+      compressorMid.control("threshold", threshold)
+      break;
+    case "/mid/sc4/ratio":
+      local ratio = message.arg(0)
+      println(ratio)
+      compressorMid.control("ratio", ratio)
+      break;
+    case "/mid/sc4/knee":
+      local knee = message.arg(0)
+      println(knee)
+      compressorMid.control("knee", knee)
+      break;
+    case "/mid/sc4/makeup_gain":
+      local makeup_gain = message.arg(0)
+      println(makeup_gain)
+      compressorMid.control("makeup_gain", makeup_gain)
+      break;
+
+    case "/high/sc4/attack":
+      local attack = message.arg(0)
+      println(attack)
+      compressorHigh.control("attack", attack)
+      break;
+    case "/high/sc4/release":
+      local release = message.arg(0)
+      println(release)
+      compressorHigh.control("release", release)
+      break;
+    case "/high/sc4/threshold":
+      local threshold = message.arg(0)
+	    if(threshold <= 0.1) { threshold = -30.0 }
+	    if(threshold > 0.0) { threshold = ratio2db(30,threshold) }
+      println(threshold)
+      compressorHigh.control("threshold", threshold)
+      break;
+    case "/high/sc4/ratio":
+      local ratio = message.arg(0)
+      println(ratio)
+      compressorHigh.control("ratio", ratio)
+      break;
+    case "/high/sc4/knee":
+      local knee = message.arg(0)
+      println(knee)
+      compressorHigh.control("knee", knee)
+      break;
+    case "/high/sc4/makeup_gain":
+      local makeup_gain = message.arg(0)
+      println(makeup_gain)
+      compressorHigh.control("makeup_gain", makeup_gain)
+      break;
+
+
+    case "/eq/lo":
+		println(message.arg(0))
+      local lo_gain = message.arg(0)
+	    if(lo_gain <= 0.1) { lo_gain = -70.0 }
+	    if(lo_gain > 0.0) { lo_gain = ratio2db(70,lo_gain) }
+      //println(lo_gain)
+      eq.control("lo", lo_gain)
+      break;
+    case "/eq/mid":
+      local mid_gain = message.arg(0)
+	    if(mid_gain <= 0.1) { mid_gain = -70.0 }
+	    if(mid_gain > 0.0) { mid_gain = ratio2db(70,mid_gain) }
+      println(mid_gain)
+      eq.control("mid", mid_gain)
+      break;
+    case "/eq/hi":
+      local high_gain = message.arg(0)
+
+	    if(high_gain <= 0.1) { high_gain = -70.0 }
+	    if(high_gain > 0.0) { high_gain = ratio2db(70,high_gain) }
+
+      println(high_gain)
+
+      eq.control("hi", high_gain)
+      break;
+
+    default:
+		println("warning: unknown message path " + message.path)
+  }
+})
+
+Script.stayAlive()

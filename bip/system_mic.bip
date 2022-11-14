@@ -1,0 +1,39 @@
+local inputSystem = Audio.StereoInput("inputSystem", false)
+
+local highPass = Lv2.Plugin("http://moddevices.com/plugins/mod-devel/HighPassFilter")
+
+highPass.control("Freq", 20.0)
+highPass.control("Order", 2.0)
+
+local lowPass = Lv2.Plugin("http://moddevices.com/plugins/mod-devel/LowPassFilter")
+
+lowPass.control("Freq", 18000.0)
+lowPass.control("Order", 2.0)
+
+local expander = Lv2.Plugin("http://plugin.org.uk/swh-plugins/se4")
+
+expander.control("rms_peak", 0.0)
+expander.control("attack", 101.125)
+expander.control("release", 401.0)
+expander.control("threshold", 0.0)
+expander.control("ratio", 1.0)
+expander.control("knee", 3.25)
+expander.control("attenuation", 0.0)
+expander.control("ratio", 1.0)
+
+local compressor = Lv2.Plugin("http://plugin.org.uk/swh-plugins/sc1")
+
+compressor.control("attack", 101.5)
+compressor.control("release", 401.0)
+compressor.control("threshold", -20.0)
+compressor.control("ratio", 2.0)
+compressor.control("knee", 0.5)
+compressor.control("makeup_gain", 0.0)
+
+local mono_to_stereo = Lv2.Plugin("http://plugin.org.uk/swh-plugins/split")
+
+local output = Audio.StereoOutput("main_output", false)
+
+inputSystem => highPass => lowPass => expander => compressor => mono_to_stereo => output
+
+Script.stayAlive()

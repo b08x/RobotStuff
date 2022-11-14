@@ -1,0 +1,39 @@
+local reverb = Lv2.Plugin("urn:dragonfly:room")
+
+reverb.control("dry_level", 80.0)
+reverb.control("late_level", 10.0)
+
+reverb.control("size", 8.0)
+reverb.control("width", 50.0)
+
+
+/**
+## Midi Controller
+
+Create a system MIDI input, connect to a control surface via e.g. QJackCtl,
+and control nekobi parameters with knobs that send MIDI CC 15 and 16:
+*/
+local controller = Midi.Input("reverbControl")
+
+controller.onControl(function(cc, m) {
+	if(cc.controller == 27) {
+		println("dry " + cc.value / 1.27)
+		reverb.control("dry_level", cc.value / 1.27)
+	} else if(cc.controller == 28) {
+		println("late " + cc.value / 1.27)
+		reverb.control("late_level", cc.value / 1.27)
+	} else if(cc.controller == 29) {
+		println("size " + cc.value / 1.00)
+		reverb.control("size", cc.value / 1.00)
+	} else if(cc.controller == 30) {
+		println("width " + cc.value * 1.181)
+		reverb.control("size", cc.value * 1.181)
+	}
+
+})
+
+mainInput <- Audio.StereoInput("main_input", false)
+
+mainInput => reverb => Audio.StereoOutput("main_output", false)
+
+Script.stayAlive()

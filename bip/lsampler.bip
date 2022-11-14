@@ -1,0 +1,115 @@
+local ls01 = Audio.Input("ls01", "LinuxSampler:0")
+local ls02 = Audio.Input("ls02", "LinuxSampler:1")
+local ls03 = Audio.Input("ls03", "LinuxSampler:2")
+local ls04 = Audio.Input("ls04", "LinuxSampler:3")
+local ls05 = Audio.Input("ls05", "LinuxSampler:4")
+local ls06 = Audio.Input("ls06", "LinuxSampler:5")
+local ls07 = Audio.Input("ls07", "LinuxSampler:6")
+local ls08 = Audio.Input("ls08", "LinuxSampler:7")
+
+local mixer = Lv2.Plugin("http://github.com/blablack/ams-lv2/stereomixer_8ch")
+mixer.control("masterVolume", 0.8)
+
+mixer.control("mute1", 0.0)
+mixer.control("solo1", 0.0)
+mixer.control("volume1", 0.4)
+mixer.control("pan1", -0.45)
+
+mixer.control("mute2", 0.0)
+mixer.control("solo2", 0.0)
+mixer.control("volume2", 0.4)
+mixer.control("pan2", 0.3)
+
+mixer.control("mute3", 0.0)
+mixer.control("solo3", 0.0)
+mixer.control("volume3", 0.4)
+mixer.control("pan3", -0.40)
+
+mixer.control("mute4", 0.0)
+mixer.control("solo4", 0.0)
+mixer.control("volume4", 0.8)
+mixer.control("pan4", 0.4)
+
+mixer.control("mute5", 0.0)
+mixer.control("solo5", 0.0)
+mixer.control("volume5", 0.8)
+mixer.control("pan5", 0.0)
+
+mixer.control("mute6", 0.0)
+mixer.control("solo6", 0.0)
+mixer.control("volume6", 0.8)
+mixer.control("pan6", 0.0)
+
+mixer.control("mute7", 0.0)
+mixer.control("solo7", 0.0)
+mixer.control("volume7", 0.8)
+mixer.control("pan7", 0.0)
+
+mixer.control("mute8", 0.0)
+mixer.control("solo8", 0.0)
+mixer.control("volume8", 0.8)
+mixer.control("pan8", 0.0)
+
+ls01.output[0] -> mixer.input[0]
+ls02.output[0] -> mixer.input[1]
+ls03.output[0] -> mixer.input[2]
+ls04.output[0] -> mixer.input[3]
+ls05.output[0] -> mixer.input[4]
+ls06.output[0] -> mixer.input[5]
+ls07.output[0] -> mixer.input[6]
+ls08.output[0] -> mixer.input[7]
+
+local output = Audio.StereoOutput("main_output", false)
+
+local reverb = Lv2.Plugin("http://calf.sourceforge.net/plugins/Reverb")
+reverb.control("amount", 0.2)
+reverb.control("room_size", 3.0)
+
+
+mixer =>reverb => output
+
+function ratio2db(min, ratio) { return min * Math.log10(ratio) }
+
+local oscInput = Osc.Input(3033)
+local oscOutput = Osc.Output("localhost", 8060)
+
+println("listening on port 3033")
+
+oscInput.onReceive(function(message) {
+
+  switch(message.path) {
+    case "/mixer":
+      local action = message.arg(0)
+      local value = Math.atan(message.arg(1))
+      println(value)
+	    mixer.control(action, value)
+      break;
+
+
+    default:
+		println("warning: unknown message path " + message.path)
+  }
+})
+
+local controller = Midi.Input("mixerControl")
+
+controller.onControl(function(cc, m) {
+	println(cc)
+	if(cc.controller == 27) {
+		println("mute1 " + cc.value)
+		mixer.control("mute1", cc.value / 1.27)
+	} else if(cc.controller == 28) {
+		println("solo1 " + cc.value / 1.27)
+		mixer.control("solo1", cc.value / 1.27)
+	} else if(cc.controller == 29) {
+		println("volume1 " + cc.value / 127.0)
+		mixer.control("volume1", cc.value / 127.0)
+	} else if(cc.controller == 30) {
+		println("pan1 " + cc.value * 1.181)
+		mixer.control("pan1", cc.value * 1.181)
+	}
+
+})
+
+
+Script.stayAlive()

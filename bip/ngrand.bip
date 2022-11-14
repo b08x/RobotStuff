@@ -1,0 +1,54 @@
+
+local ngrand = Audio.Input("ngrand")
+
+local hpf = Lv2.Plugin("http://moddevices.com/plugins/mod-devel/HighPassFilter")
+
+hpf.control("Order", 2)
+hpf.control("Freq", 60.0)
+
+local xover = Lv2.Plugin("http://moddevices.com/plugins/mod-devel/CrossOver2")
+
+xover.control("Freq", 600.0)
+xover.control("Gain_1", 0.0)
+xover.control("Gain_2", 0.0)
+xover.control("Order", 2.0)
+
+local compressorLow = Lv2.Plugin("http://plugin.org.uk/swh-plugins/sc1")
+compressorLow.control("attack", 101.5)
+compressorLow.control("release", 401.0)
+compressorLow.control("threshold", -20.0)
+compressorLow.control("ratio", 2.0)
+compressorLow.control("knee", 0.5)
+compressorLow.control("makeup_gain", 0.0)
+compressorLow.saveState("/home/b08x/.lv2/sc1.lv2/test.ttl")
+
+local compressorHigh = Lv2.Plugin("http://plugin.org.uk/swh-plugins/sc1")
+compressorHigh.control("attack", 101.5)
+compressorHigh.control("release", 401.0)
+compressorHigh.control("threshold", -20.0)
+compressorHigh.control("ratio", 2.0)
+compressorHigh.control("knee", 0.5)
+compressorHigh.control("makeup_gain", 4.0)
+
+local eq = Lv2.Plugin("http://plugin.org.uk/swh-plugins/dj_eq_mono")
+
+eq.control("lo", -1.0)
+eq.control("mid", 0.0)
+eq.control("hi", 0.0)
+
+ngrand => hpf => xover
+
+xover.output[0] -> compressorLow.input[0]
+xover.output[1] -> compressorHigh.input[0]
+
+local mixer = Audio.Mixer(2, 1)
+
+mixer.add(compressorLow)
+mixer.add(compressorHigh)
+
+mixer => eq
+
+local output = Audio.Output("main_output")
+
+
+Script.stayAlive()

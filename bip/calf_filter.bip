@@ -1,0 +1,36 @@
+
+//		Modes:
+//			1 = "24dB/oct Lowpass"
+//			0 = "12dB/oct Lowpass"
+//			2 = "36dB/oct Lowpass"
+//			3 = "12dB/oct Highpass"
+//			4 = "24dB/oct Highpass"
+//			5 = "36dB/oct Highpass"
+//			6 = "6dB/oct Bandpass"
+//			7 = "12dB/oct Bandpass"
+//			8 = "18dB/oct Bandpass"
+//			9 = "6dB/oct Bandreject"
+//			10 = "12dB/oct Bandreject"
+//			11 = "18dB/oct Bandreject"
+//			12 = "Allpass"
+
+/* Name:        Resonance */
+/* Minimum:     0.707000 */
+/* Maximum:     32.000000 */
+/* Default:     0.707000 */
+
+/* Name:        Inertia */
+/* Minimum:     5.000000 */
+/* Maximum:     100.000000 */
+/* Default:     20.000000 */
+
+
+local filter = Lv2.Plugin("http://calf.sourceforge.net/plugins/Filter")
+
+filter.control("freq", 7006.29.0)
+filter.control("res", 7.3)
+filter.control("mode", 11.0)
+filter.control("bypass", 0.0)
+
+
+Script.stayAlive()

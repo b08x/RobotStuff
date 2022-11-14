@@ -1,0 +1,35 @@
+timebase <- Jack.Timebase(89.0)
+
+Time.def = timebase
+
+local oscOutput = Osc.Output("localhost", 3333)
+
+oscOutput.send(Osc.Message("/greeting"))
+
+
+local port = 3033
+local oscInput = Osc.Input(port)
+print("listening on port " + port + "..\n")
+
+oscInput.onReceive(function(message) {
+ 
+    switch(message.path) {
+    case "/play":
+        timebase.start()
+        break;
+ 
+    case "/stop":
+        timebase.stop()
+        break;
+ 
+    case "/exit":
+        Script.exit(0)
+        print("exiting\n")
+        break;
+ 
+    default:
+        print("warning: unknown message path " + message.path + "\n")
+    }
+})
+ 
+Script.stayAlive()

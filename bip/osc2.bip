@@ -1,0 +1,10 @@
+
+
+
+
+
+local oscOutput <- Osc.Output("localhost", 8060)
+
+local oscMsg = Osc.Message({})
+
+oscOutput.send(oscMsg.add(3.0))

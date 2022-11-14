@@ -1,0 +1,95 @@
+local seq = Lv2.Plugin("http://gareus.org/oss/lv2/stepseq#s8n8")
+
+/* Scale Points:
+	3 = "Quarter"
+	2 = "8th"
+	4 = "Half Note"
+	5 = "One Bar"
+	6 = "3/2 Bars"
+	7 = "2 Bars"
+	8 = "3 Bars"
+	9 = "4 Bars"
+	0 = "32th"
+	1 = "16th" */
+
+seq.control("sync", 1)
+seq.control("bpm", 60.00)
+seq.control("div", 3.0)
+seq.control("swing", 0.0)
+seq.control("drummode", 0.0)
+seq.control("chn", 1.0)
+seq.control("panic", 0.0)
+
+
+local port = 3033
+local oscInput = Osc.Input(port)
+print("listening on port " + port + "..\n")
+
+oscInput.onReceive(function(message) {
+  switch(message.path) {
+    case "/seq/note1":
+      local note = message.arg(0)
+      seq.control("note1", note)
+      break;
+    case "/seq/note2":
+      local note = message.arg(0)
+      seq.control("note2", note)
+      break;
+    case "/seq/note3":
+      local note = message.arg(0)
+      seq.control("note3", note)
+      break;
+    case "/seq/note4":
+      local note = message.arg(0)
+      seq.control("note4", note)
+      break;
+    case "/seq/note5":
+      local note = message.arg(0)
+      seq.control("note5", note)
+      break;
+    case "/seq/note6":
+      local note = message.arg(0)
+      seq.control("note6", note)
+      break;
+    case "/seq/note7":
+      local note = message.arg(0)
+      seq.control("note7", note)
+      break;
+    case "/seq/note8":
+      local note = message.arg(0)
+      seq.control("note8", note)
+      break;
+    case "/seq/grid/1/1":
+      local velocity = message.arg(0) / 1.0
+      println(velocity)
+	    seq.control("grid_1_1", velocity)
+      break;
+    case "/seq/grid/1/2":
+      local velocity = message.arg(0) / 1.0
+      println(velocity)
+	    seq.control("grid_1_2", velocity)
+      break;
+    case "/seq/grid/1/3":
+      local velocity = message.arg(0) / 1.0
+      println(velocity)
+	    seq.control("grid_1_2", velocity)
+      break;
+    case "/seq/grid/1/4":
+      local velocity = message.arg(0) / 1.0
+      println(velocity)
+	    seq.control("grid_1_2", velocity)
+      break;
+  	case "/exit":
+  		Script.exit(0)
+  		println("exiting")
+  		break;
+    default:
+		  println("warning: unknown message path " + message.path)
+	   }
+})
+
+local midiOut = Midi.Output("stepseq")
+
+seq => midiOut
+
+Script.stayAlive()

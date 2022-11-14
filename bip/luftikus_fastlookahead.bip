@@ -1,0 +1,106 @@
+https://code.google.com/p/lkjb-plugins/luftikus
+
+http://plugin.org.uk/swh-plugins/fastLookaheadLimiter
+
+
+
+
+     Port 5:
+		Type:        http://lv2plug.in/ns/lv2core#ControlPort
+		            http://lv2plug.in/ns/lv2core#InputPort
+		Symbol:      gain_10_hz
+		Name:        Gain 10 Hz
+		Minimum:     0.000000
+		Maximum:     1.000000
+		Default:     0.500000
+
+	Port 6:
+		Type:        http://lv2plug.in/ns/lv2core#ControlPort
+		            http://lv2plug.in/ns/lv2core#InputPort
+		Symbol:      gain_40_hz
+		Name:        Gain 40 Hz
+		Minimum:     0.000000
+		Maximum:     1.000000
+		Default:     0.500000
+
+	Port 7:
+		Type:        http://lv2plug.in/ns/lv2core#ControlPort
+		            http://lv2plug.in/ns/lv2core#InputPort
+		Symbol:      gain_160_hz
+		Name:        Gain 160 Hz
+		Minimum:     0.000000
+		Maximum:     1.000000
+		Default:     0.500000
+
+	Port 8:
+		Type:        http://lv2plug.in/ns/lv2core#ControlPort
+		            http://lv2plug.in/ns/lv2core#InputPort
+		Symbol:      gain_640_hz
+		Name:        Gain 640 Hz
+		Minimum:     0.000000
+		Maximum:     1.000000
+		Default:     0.500000
+
+	Port 9:
+		Type:        http://lv2plug.in/ns/lv2core#ControlPort
+		            http://lv2plug.in/ns/lv2core#InputPort
+		Symbol:      gain_2_5_khz
+		Name:        Gain 2.5 kHz
+		Minimum:     0.000000
+		Maximum:     1.000000
+		Default:     0.500000
+
+	Port 10:
+		Type:        http://lv2plug.in/ns/lv2core#ControlPort
+		            http://lv2plug.in/ns/lv2core#InputPort
+		Symbol:      gain_high
+		Name:        Gain High
+		Minimum:     0.000000
+		Maximum:     1.000000
+		Default:     0.000000
+
+	Port 11:
+		Type:        http://lv2plug.in/ns/lv2core#ControlPort
+		            http://lv2plug.in/ns/lv2core#InputPort
+		Symbol:      type_high
+		Name:        Type High
+		Minimum:     0.000000
+		Maximum:     1.000000
+		Default:     0.000000
+
+	Port 12:
+		Type:        http://lv2plug.in/ns/lv2core#ControlPort
+		            http://lv2plug.in/ns/lv2core#InputPort
+		Symbol:      keep_gain
+		Name:        Keep Gain
+		Minimum:     0.000000
+		Maximum:     1.000000
+		Default:     0.000000
+
+	Port 13:
+		Type:        http://lv2plug.in/ns/lv2core#ControlPort
+		            http://lv2plug.in/ns/lv2core#InputPort
+		Symbol:      analog
+		Name:        Analog
+		Minimum:     0.000000
+		Maximum:     1.000000
+		Default:     0.000000
+
+	Port 14:
+		Type:        http://lv2plug.in/ns/lv2core#ControlPort
+		            http://lv2plug.in/ns/lv2core#InputPort
+		Symbol:      mastering
+		Name:        Mastering
+		Minimum:     0.000000
+		Maximum:     1.000000
+		Default:     0.000000
+
+	Port 15:
+		Type:        http://lv2plug.in/ns/lv2core#ControlPort
+		            http://lv2plug.in/ns/lv2core#InputPort
+		Symbol:      mastervol
+		Name:        MasterVol
+		Minimum:     0.000000
+		Maximum:     1.000000
+		Default:     0.500000
+[soundbot][~]
