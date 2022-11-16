@@ -174,10 +174,6 @@ if [ $? = 0 ]; then
     i3-msg "[class="^Patchage$"], floating enable, resize set 1252 780, move position 1478px 1160";sleep 0.25
   fi
 
-  # i3-msg "[class="^Pavucontrol$"], resize set 1103 535, move position 2829px 1328";sleep 0.25
-
-  # i3-msg "[class="alsamixer"], floating enable, resize set 1319 479, move position 2616px 585";sleep 0.25
-
   i3-msg "[class="Zita-mu1"], scratchpad show, move position 2197px 2388";sleep 0.25
 
   focus

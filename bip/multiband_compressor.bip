@@ -10,10 +10,7 @@ compressorSub.control("ratio", 2.0)
 compressorSub.control("knee", 0.5)
 compressorSub.control("makeup_gain", 0.0)
 
-local mono_to_stereo = Lv2.Plugin("http://plugin.org.uk/swh-plugins/split")
-
-Sub => compressorSub => mono_to_stereo
-
+Sub => compressorSub
 
 local compressorMid = Lv2.Plugin("http://plugin.org.uk/swh-plugins/sc4")
 compressorMid.control("rms_peak", 1.0)
@@ -37,9 +34,9 @@ compressorHigh.control("makeup_gain", 0.0)
 
 High => compressorHigh
 
-local mixer = Audio.Mixer(6, 2)
+local mixer = Audio.Mixer(5, 2)
 
-mixer.add(mono_to_stereo)
+mixer.add(compressorSub)
 mixer.add(compressorMid)
 mixer.add(compressorHigh)
 
