@@ -14,7 +14,7 @@ module Monk
   include Coltrane::Theory
 
   # Given a MIDI note number, return the name and octave as a string.
-  def midi_to_note(num)
+  def note(num)
     Pitch.new(num).name.downcase.gsub(/\#/,'s').to_sym
   end
 

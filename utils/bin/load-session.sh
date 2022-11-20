@@ -75,10 +75,6 @@ fi
 if [ $? = 0 ]; then
   if pgrep -x "patchage" > /dev/null
   then
-    i3-msg "[class="^Patchage$"], move to workspace 8"
-
-    i3-msg "workspace 8"
-
     xdotool search --onlyvisible --name "Patchage" key ctrl+r
     sleep 0.25
     xdotool search --onlyvisible --name "Patchage" key ctrl+g
