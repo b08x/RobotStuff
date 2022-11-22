@@ -28,7 +28,7 @@ module Monk
 
   def degrees(scale)
 
-    notes = scale.notes.map {|n| midi_to_note(n)}
+    notes = scale.notes.map { |n| note(n)}
 
     degrees = 0..(notes.length - 1)
 

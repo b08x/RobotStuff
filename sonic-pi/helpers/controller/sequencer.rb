@@ -2,15 +2,15 @@
 
 # creates an array with 16 placeholders as nil
 # convert nils to zeros https://stackoverflow.com/a/2527779
-defonce :set_initial_sequences do
+# defonce :set_initial_sequences do
+#
+#   [:seq1, :seq2, :seq3, :seq4 ].each do |seq|
+#     set seq, Array.new(16).map!{|x|x ?x:0}
+#   end
+#
+# end
 
-  [:seq1, :seq2, :seq3, :seq4 ].each do |seq|
-    set seq, Array.new(16).map!{|x|x ?x:0}
-  end
-
-end
-
-set_initial_sequences
+# set_initial_sequences
 
 $generate_sequence = lambda do |array,bool,index|
   array.delete_at(index)
@@ -42,7 +42,7 @@ def seq_router
   end
 
 end
-# 
+#
 # live_loop :hey do
 #   16.times do
 #     tick

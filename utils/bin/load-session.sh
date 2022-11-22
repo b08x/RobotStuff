@@ -65,7 +65,7 @@ if [ $? = 0 ]; then
       i3-msg "exec --no-startup-id reaper -nosplash $project";sleep 2
     fi
 
-    i3-msg "[class="^REAPER$"], move to workspace 2"
+    i3-msg "[class="^REAPER$"], move to workspace 6"
 
     sleep 0.5
 
