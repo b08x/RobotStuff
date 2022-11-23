@@ -1,8 +1,19 @@
 #!/usr/bin/env bash
 
-systemctl --user stop gvfs-afc-volume-monitor.service && \
-systemctl --user stop gvfs-daemon.service && \
-systemctl --user stop gvfs-gphoto2-volume-monitor.service && \
-systemctl --user stop gvfs-metadata.service && \
-systemctl --user stop gvfs-mtp-volume-monitor.service && \
-systemctl --user stop gvfs-udisks2-volume-monitor.service
+stop_service() {
+  application=$1
+  systemctl --user stop $application.service
+}
+
+services=("gvfs-afc-volume-monitor"
+          "gvfs-daemon"
+          "gvfs-gphoto2-volume-monitor"
+          "gvfs-metadata"
+          "gvfs-mtp-volume-monitor"
+          "gvfs-udisks2-volume-monitor")
+
+for s in ${services[@]}; do
+  stop_service $s || continue
+done
+
+return 0

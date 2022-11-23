@@ -36,6 +36,11 @@ then
   i3-msg "exec --no-startup-id pkill -9 x42-meter"
 fi
 
+if pgrep -x "jmeters" > /dev/null
+then
+  pkill -9 jmeters
+fi
+
 if pgrep -x "patchage" > /dev/null
 then
   i3-msg "exec --no-startup-id pkill -9 patchage";sleep 2
