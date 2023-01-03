@@ -2,20 +2,25 @@
 
 # creates an array with 16 placeholders as nil
 # convert nils to zeros https://stackoverflow.com/a/2527779
-# defonce :set_initial_sequences do
-#
-#   [:seq1, :seq2, :seq3, :seq4 ].each do |seq|
-#     set seq, Array.new(16).map!{|x|x ?x:0}
-#   end
-#
-# end
-
-# set_initial_sequences
 
 $generate_sequence = lambda do |array,bool,index|
   array.delete_at(index)
   array.insert(index,bool)
 end
+
+class Sequencer
+
+  def initialize
+    [:seq1, :seq2, :seq3, :seq4 ].each do |seq|
+      set seq, Array.new(16).map!{|x|x ?x:0}
+    end
+  end
+
+end
+
+sequencer = Sequencer.new
+
+
 
 def seq_router
   live_loop :router do
@@ -39,25 +44,26 @@ def seq_router
     seq = $generate_sequence[i, get[:onoff], get[:index]]
     set :seq1, seq
 
+
   end
 
 end
 #
-# live_loop :hey do
-#   16.times do
-#     tick
-#     sample :bd_gas, on: get[:seq1].ring.look
-#     #play 48, amp: 1.0, attack: 0.125, release: 0.125, on: @seq1.ring.look
-#     sleep 0.25
-#   end
-# end
-#
-#
-# live_loop :seq2 do
-#   8.times do
-#     note = get[:note]
-#     tick
-#     play note, amp: 1.0, attack: 0.125, release: 0.125, on: get[:seq2].ring.look
-#     sleep 0.25
-#   end
-# end
+live_loop :hey do
+  16.times do
+    tick
+    sample :bd_gas, on: get[:seq1].ring.look
+    #play 48, amp: 1.0, attack: 0.125, release: 0.125, on: @seq1.ring.look
+    sleep 0.25
+  end
+end
+
+
+live_loop :seq2 do
+  8.times do
+    note = get[:note]
+    tick
+    play note, amp: 1.0, attack: 0.125, release: 0.125, on: get[:seq2].ring.look
+    sleep 0.25
+  end
+end
