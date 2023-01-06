@@ -1,53 +1,45 @@
 # Welcome to Sonic Pi
 
-$generate_sequence = lambda do |array,bool,index|
+$generate_sequence = lambda do |array,value,index|
   array.delete_at(index)
-  array.insert(index,bool)
+  array.insert(index,value)
 end
 
 class Sequencer
-  attr_accessor :seq1, :seq2, :seq3, :seq4, :midiseq1
+  attr_accessor :pattern1, :pattern2, :pattern3, :pattern4, :notes1
   
   def initialize
-    
-    @seq1 = Array.new(16).map!{|x|x ?x:0}
-    @seq2 = Array.new(16).map!{|x|x ?x:0}
-    @seq3 = Array.new(16).map!{|x|x ?x:0}
-    @seq4 = Array.new(16).map!{|x|x ?x:0}
-    @midiseq1 = Array.new(8).map!{|x|x ?x:0}
-    
-  end
-  
-  def generate(array,bool,index)
-    array.delete_at(index)
-    array.insert(index,bool)
-    return array
-  end
-  
-  def generate_midi(array,note,index)
-    if index == "reset"
-      array = Array.new(8).map!{|x|x ?x:0}
-    else
-      array.delete_at(index)
-      array.insert(index,note)
-    end
-    return array
+    @pattern1 = Array.new(16).map!{|x|x ?x:false}
+    @pattern2 = Array.new(16).map!{|x|x ?x:false}
+    @pattern3 = Array.new(16).map!{|x|x ?x:false}
+    @pattern4 = Array.new(16).map!{|x|x ?x:false}
+    @notes1 = Array.new(8).map!{|x|x ?x:0}
   end
   
 end
 
-@sequence = Sequencer.new
+@sequencer = Sequencer.new
 
-def seq_router
+if get[:pattern1].nil?
+  set :pattern1, @sequencer.seq1
+  set :pattern2, @sequencer.seq2
+  set :pattern3, @sequencer.seq3
+  set :pattern4, @sequencer.seq4
+end
+
+if get[:notes1].nil?
+  set :notes1, @sequencer.notes1
+end
+
+
+def start_router
   live_loop :router do
     
     use_real_time
-    
-    onoff = sync "/osc*/*/*"
+    # this will be either 1 or 0
+    value = sync "/osc*/*/*"
     
     message = parse_sync_address("/osc*/*/*")
-    
-    print onoff
     print message
     
     row = message[1]
@@ -62,52 +54,61 @@ def seq_router
       set :index, index - 1
     end
     
-    set :onoff, onoff[0]
+    print get[:index]
+    
+    set :value, value[0]
+    print get[:value]
     
     case row
-    when "seq1"
-      seq = @sequence.generate(@sequence.seq1 ,get[:onoff], get[:index])
+    when "pattern1"
+      seq = $generate_sequence[@sequencer.pattern1 ,get[:value], get[:index]]
       print seq
       set row.to_sym, seq
-    when "seq2"
-      seq = @sequence.generate(@sequence.seq2 ,get[:onoff], get[:index])
+    when "pattern2"
+      seq = $generate_sequence[@sequencer.pattern2 ,get[:value], get[:index]]
       print seq
       set row.to_sym, seq
-    when "seq3"
-      seq = @sequence.generate(@sequence.seq3 ,get[:onoff], get[:index])
+    when "pattern3"
+      seq = $generate_sequence[@sequencer.pattern3 ,get[:value], get[:index]]
       print seq
       set row.to_sym, seq
-    when "seq4"
-      seq = @sequence.generate(@sequence.seq4 ,get[:onoff], get[:index])
+    when "pattern4"
+      seq = $generate_sequence[@sequencer.pattern4 ,get[:value], get[:index]]
       print seq
       set row.to_sym, seq
-    when "midiseq1"
-      midiseq = @sequence.generate_midi(@sequence.midiseq1 ,get[:onoff], get[:index])
-      print midiseq
-      
-      set row.to_sym, midiseq
+    when "notes"
+      if get[:index] == "reset"
+        set row.to_sym, Array.new(8).map!{|x|x ?x:0}
+      else
+        notes =  $generate_sequence[@sequencer.notes1 ,get[:value], get[:index]]
+        print notes
+        set :notes1, notes
+      end
     end
     
   end
   
 end
 
-seq_router
+start_router
 
-live_loop :test do
+uncomment do
   
-  notes = get[:midiseq1].ring
+  live_loop :test do
+    print get[:notes1].ring
+    
+    notes = get[:notes1].ring
+    
+    midi notes.tick, velocity: 90
+    sleep 0.25
+    
+  end
   
-  midi notes.tick, velocity: 90, channel: 1
-  sleep 1
-  
-end
-
-live_loop :hey do
-  16.times do
-    tick
-    sample SOUNDS, "RC_Kick_01", 6, amp: 0.5, on: get[:seq1].ring.look
-    #play 48, amp: 1.0, attack: 0.125, release: 0.125, on: @seq1.ring.look
+  live_loop :hey do
+    
+    sample SOUNDS, "RC_Kick_01", 6, amp: 0.5 if get[:pattern1].ring.tick
+    #play 48, amp: 1.0, attack: 0.125, release: 0.125, on: @pattern1.ring.look
     sleep 0.25
   end
+  
 end
