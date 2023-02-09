@@ -4,3 +4,6 @@
 [submodule "soundbot"]
 	path = soundbot
 	url = git@gitlab.com:b08x/soundbot.git
+[submodule "sonic-pi/modules/ziffers"]
+	path = sonic-pi/modules/ziffers
+	url = https://github.com/amiika/ziffers.git
