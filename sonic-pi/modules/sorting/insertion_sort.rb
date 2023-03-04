@@ -1,16 +1,23 @@
 # INSERTION SORT
-def insertion_sort(list: DEFAULT_LIST_SELECT_INSERT, sorted: DEFAULT_SORTED, amp: 1, play_list: true,
-                   drums: { bd: :bd_tek, cyms: :drum_cymbal_closed, sn: :drum_splash_soft }, sleep: 0.125,
-                   synths: { main: :piano, opt1: :tri, opt2: :pluck }, shutup_drums: false,
-                   shutup_synths: false, silence: false, drums_amp: 0, synths_amp: 0)
+def insertion_sort(list: DEFAULT_LIST_SELECT_INSERT, sorted: DEFAULT_SORTED,
+  amp: 1,
+  play_list: true,
+  shutup_drums: false, shutup_synths: false,
+  drums: { bd: :bd_tek, cyms: :drum_cymbal_closed, sn: :drum_splash_soft },
+  drums_amp: 0,
+  synths: { main: :piano, opt1: :tri, opt2: :pluck },
+  synths_amp: 0,
+  sleep: 0.125,
+  silence: false
+  )
 
-  arr = list.dup
-  r = arr.length - 1
+  notes = list.dup
+  r = notes.length - 1
   swaps = 0
 
   use_synth synths[:main]
   if play_list
-    arr.each do |n|
+    notes.each do |n|
       play n, amp: if silence
                      0
                    else
@@ -28,20 +35,20 @@ def insertion_sort(list: DEFAULT_LIST_SELECT_INSERT, sorted: DEFAULT_SORTED, amp
                             else
                               amp * 2 + drums_amp < 0 ? 0 : amp * 2 + drums_amp
                             end
-    key = arr[i]
+    key = notes[i]
     j = i - 1
 
     overwrites = 0
-    while j >= 0 and arr[j] > key
-      arr[j + 1] = arr[j]
+    while j >= 0 and notes[j] > key
+      notes[j + 1] = notes[j]
       j -= 1
       overwrites += 1
     end
 
     note_swapped = false
-    if arr[j + 1] != key
-      note_swapped = arr[j + 1]
-      arr[j + 1] = key
+    if notes[j + 1] != key
+      note_swapped = notes[j + 1]
+      notes[j + 1] = key
       swaps += 1
     else
       sample drums[:sn], amp: if silence
@@ -69,7 +76,7 @@ def insertion_sort(list: DEFAULT_LIST_SELECT_INSERT, sorted: DEFAULT_SORTED, amp
       end
     end
 
-    sub = arr[0..i]
+    sub = notes[0..i]
     sl = sub.length * sleep > 2 ? 4.0 - (sub.length * sleep) : 2.0 - (sub.length * sleep)
 
     sub.each do |n|
@@ -118,5 +125,5 @@ def insertion_sort(list: DEFAULT_LIST_SELECT_INSERT, sorted: DEFAULT_SORTED, amp
     sleep sl
   end
 
-  sorted.call(arr, 'Insertion Sort') unless silence
+  sorted.call(notes, 'Insertion Sort') unless silence
 end

@@ -1,16 +1,24 @@
 # BUBBLE SORT
-def bubble_sort(list: DEFAULT_LIST_BUBBLE, sorted: DEFAULT_SORTED, amp: 1, play_list: true, synth: :piano, drums: { bd: :bd_tek, cyms: :drum_cymbal_closed },
-sleep: 1, shutup_drums: false, drums_amp: 0, bleeps_amp: 0, synths_amp: 0, shutup_synths: false,
-                shutup_bleeps: false, silence: false)
+def bubble_sort(list: DEFAULT_LIST_BUBBLE, sorted: DEFAULT_SORTED,
+  amp: 1,
+  play_list: true,
+  synth: :piano,
+  drums: { bd: :bd_tek, cyms: :drum_cymbal_closed },
+  sleep: 1,
+  shutup_drums: false,
+  shutup_synths: false,
+  shutup_bleeps: false,
+  drums_amp: 0, bleeps_amp: 0, synths_amp: 0,
+  silence: false)
 
-  arr = list.dup
+  notes = list.dup
   swapped = false
-  r = arr.length - 2
-  num_iters = 0
+  r = notes.length - 2
+  iterations = 0
 
   use_synth synth
   if play_list
-    arr.each do |n|
+    notes.each do |n|
       3.times do
         midi n, sustain: 0.1
         sleep 0.125
@@ -22,7 +30,7 @@ sleep: 1, shutup_drums: false, drums_amp: 0, bleeps_amp: 0, synths_amp: 0, shutu
 
   while true
     swaps = 0
-    num_iters += 1
+    iterations += 1
 
     in_thread do
       sample drums[:bd], amp: if silence
@@ -35,7 +43,7 @@ sleep: 1, shutup_drums: false, drums_amp: 0, bleeps_amp: 0, synths_amp: 0, shutu
     end
 
     in_thread do
-      num_iters.times do |i|
+      iterations.times do |i|
         sample drums[:cyms],
                amp: if silence
                       0
@@ -44,12 +52,12 @@ sleep: 1, shutup_drums: false, drums_amp: 0, bleeps_amp: 0, synths_amp: 0, shutu
                     else
                       amp + (i.to_f / 2.0) + drums_amp < 0 ? 0 : amp + (i.to_f / 2.0) + drums_amp
                     end, rate: 2
-        sleep (2.0 / num_iters).round(2)
+        sleep (2.0 / iterations).round(2)
       end
     end
 
     for i in 0..r
-      play arr[i], amp: if silence
+      play notes[i], amp: if silence
                           0
                         elsif shutup_synths
                           0
@@ -57,10 +65,11 @@ sleep: 1, shutup_drums: false, drums_amp: 0, bleeps_amp: 0, synths_amp: 0, shutu
                           amp + synths_amp < 0 ? 0 : amp + synths_amp
                         end, release: 0.1
       sleep sleep
-      next unless arr[i] > arr[i + 1]
+      next unless notes[i] > notes[i + 1]
 
-      arr[i], arr[i + 1] = arr[i + 1], arr[i]
+      notes[i], notes[i + 1] = notes[i + 1], notes[i]
       swapped ||= true
+
       sample :glitch_bass_g,
              amp: if silence
                     0
@@ -70,7 +79,8 @@ sleep: 1, shutup_drums: false, drums_amp: 0, bleeps_amp: 0, synths_amp: 0, shutu
                     amp + 0.5 + bleeps_amp < 0 ? 0 : amp + 0.5 + bleeps_amp
                   end
       sleep sleep
-      play arr[i], amp: if silence
+
+      play notes[i], amp: if silence
                           0
                         elsif shutup_synths
                           0
@@ -83,5 +93,5 @@ sleep: 1, shutup_drums: false, drums_amp: 0, bleeps_amp: 0, synths_amp: 0, shutu
     swapped ? swapped = false : break
   end
 
-  sorted.call(arr, 'Bubble Sort') unless silence
+  sorted.call(notes, 'Bubble Sort') unless silence
 end
