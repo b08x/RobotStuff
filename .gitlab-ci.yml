@@ -1,0 +1,13 @@
+image: alpine:latest
+
+before_script:
+  - apk update && apk add git
+
+mirror:
+  script:
+    - |
+      git config --global http.extraheader "AUTHORIZATION: token ${GH_TOKEN}"
+      git remote add mirror https://github.com/b08x/robot-stuff.git
+      git push --mirror mirror
+  only:
+    - master
