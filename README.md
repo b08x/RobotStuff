@@ -1,6 +1,5 @@
 # robot-stuff
 
-## openai
 
 ## beats
 
