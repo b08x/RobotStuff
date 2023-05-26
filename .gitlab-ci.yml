@@ -6,8 +6,7 @@ before_script:
 mirror:
   script:
     - |
-      git config --global http.extraheader "AUTHORIZATION: token ${GH_TOKEN}"
-      git remote add mirror https://github.com/b08x/robot-stuff.git
+      git remote add mirror https://${GH_TOKEN}@github.com/b08x/robot-stuff.git
       git push --mirror mirror
   only:
     - main
