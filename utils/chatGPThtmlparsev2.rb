@@ -1,57 +1,49 @@
 #!/usr/bin/env ruby
-require 'nokogiri'
 require 'json'
 require 'fileutils'
 
-def write_html_file(json_data, i)
+def write_html_file(title, json_data, i, output)
+
   new_html = <<~HTML
     <!DOCTYPE html>
     <html>
     <head>
-    <title>Page Title</title>
+    <title></title>
     </head>
     <body>
 
-    <h1>Chat #{i}</h1>
+    <h1>#{i} #{title}</h1>
 
-    #{json_data.map { |message| "<p>#{message['content']['parts'].join}</p>" }.join}
+    #{json_data.map { |message| "<p><b>#{message['author']['role']}:</b> #{message['content']['parts'].join.gsub("\n", "<br/>")}</p>" }.join}
+
 
     </body>
     </html>
   HTML
 
-  File.write("chat_#{i}.html", new_html)
+  File.write(File.join(output, "chat_#{i}.html"), new_html)
 end
 
-filename = ARGV[0]
-# Read HTML from file
-html_content = File.read(filename)
+json_file = ARGV[0]
 
-# Parse the HTML
-doc = Nokogiri::HTML(html_content)
+output = File.join(File.dirname(json_file), 'chats')
 
+FileUtils.mkdir output unless Dir.exist?(output)
 
-# Regex to find script tag and extract JSON data
-script = doc.css('script')
-
-
-json_data = script[/var jsonData = (\[.*\]);/, 1]
-p json_data
-
-# Ensure json_data is not nil
-if json_data.nil?
-  puts "Could not find JSON data in the HTML file"
-  exit
-end
-
-# Remove HTML escaped characters
-json_data.gsub!('&#x27;', "'")
+json_data = File.read(json_file)
 
 # Parse JSON
 data = JSON.parse(json_data)
 
+
 # For each conversation in data
 data.each_with_index do |item, i|
-  messages = item['mapping'].values.map { |value| value['message'] }.compact
-  write_html_file(messages, i + 1)
+  begin
+    title = item['title']
+    messages = item['mapping'].values.map { |value| value['message'] }.compact
+    write_html_file(title, messages, i + 1, output)
+  rescue StandardError => e
+    puts "#{e.message}"
+  end
+
 end
