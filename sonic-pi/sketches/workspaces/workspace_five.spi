@@ -1,0 +1,45 @@
+# Welcome to Sonic Pi
+use_real_time
+
+# Define a chord progression
+chord_progression = (ring chord(:C4, :major7), chord(:A3, :minor7), chord(:D3, :dom7), chord(:G3, :dom7))
+
+# Define a substitute chord progression
+substitute_chord_progression = (ring chord(:D4, :minor7), chord(:F3, :dom7), chord(:E3, :minor7), chord(:A3, :dom7))
+
+# Define a rhythm pattern for accompaniment
+rhythm_pattern = (ring 1, 0.5, 0.5, 1, 0.5, 0.5)
+
+# Define a function for playing accompaniment
+define :play_accompaniment do |chord|
+  chord.each do |note|
+    play note, release: 0.15
+    sleep 0.125
+  end
+end
+
+# Define a function for playing melody
+define :play_melody do |chord|
+  puts "melody"
+  play chord.choose, amp: 0.8, release: 0.25
+  sleep 0.25
+end
+
+# Main loop
+live_loop :music do
+  # Play the chord progression and its substitute simultaneously
+  in_thread do
+    chord_progression.each do |chord|
+      play_accompaniment chord
+    end
+  end
+  
+  in_thread do
+    substitute_chord_progression.each do |chord|
+      play_melody chord
+    end
+  end
+  
+  # Sleep for a while before the next loop
+  sleep 2
+end

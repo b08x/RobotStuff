@@ -1,0 +1,117 @@
+# Sonic Pi script
+
+# Define a Romanesca progression in the key of C
+romanesca_progression = (ring chord(:E3, :minor), chord(:D4, :minor), chord(:C5, :major), chord(:G3, :major),
+                         chord(:E4, :minor), chord(:D3, :minor), chord(:C4, :major), chord(:G5, :major),
+                         chord(:C3, :major))
+
+# Define a rhythm pattern for accompaniment
+rhythm_pattern = (ring 0.75, 0.25, 0.5, 0.5, 0.75, 0.25)
+
+# Define a syncopated rhythm pattern for the melody
+syncopated_rhythm_pattern = (ring 0.25, 0.75, 0.5, 0.5, 0.75, 0.25)
+
+# Define a Euclidean rhythm for the percussion
+euclidean_rhythm = (bools 5,8)
+
+# Define a function for playing accompaniment
+define :play_accompaniment do |chord|
+  chord.each do |note|
+    play note, release: 0.3
+    sleep 0.125
+  end
+end
+
+# Define a function for playing melody
+define :play_melody do |chord, rhythm_pattern|
+  note = chord.choose
+  rhythm_pattern.each do |r|
+    play note, amp: 0.8, release: r
+    sleep r
+  end
+end
+
+# Define a function for playing percussion
+define :play_percussion do |euclidean_rhythm|
+  euclidean_rhythm.each do |beat|
+    if beat
+      sample :drum_heavy_kick
+    else
+      sample :drum_snare_hard
+    end
+    sleep 0.5
+  end
+end
+
+# Accompaniment live loop
+live_loop :accompaniment, sync: :percussion do
+  # Play the Romanesca progression
+  romanesca_progression.each do |chord|
+    play_accompaniment chord
+  end
+end
+
+# Melody live loop
+live_loop :melody, sync: :percussion do
+  # Play the Romanesca progression with a syncopated rhythm
+  romanesca_progression.each do |chord|
+    play_melody chord, syncopated_rhythm_pattern
+  end
+end
+
+# Percussion live loop
+live_loop :percussion do
+  # Play percussion with a Euclidean rhythm
+  #play_percussion euclidean_rhythm
+  print "heyo"
+  sleep syncopated_rhythm_pattern.choose
+end
+
+
+# Define the cutoff frequency for the samples
+cmaster1 = 80
+
+with_fx :sound_out_stereo, output: 3, amp: 0 do
+  # Add the provided code snippet
+  with_fx :echo, mix: 0.2 do
+    with_fx :reverb, mix: 0.2, room: 0.5 do
+      live_loop :box, sync: :percussion do
+        a = 0.80
+        density 1 do
+          sleep 1
+          sample PERCS, "Box01", rate: 2.5, cutoff: cmaster1, amp: a
+          sleep 0.25
+          sample PERCS, "Box02", rate: 2.2, start: 0.02, cutoff: cmaster1, pan: 0.2, amp: a
+          sample PERCS, "Box03", rate: 2, start: 0.04, cutoff: cmaster1, pan: -0.2, amp: a
+          sleep 1
+        end
+      end
+      
+      live_loop :bucket, sync: :percussion do
+        a = 0.75
+        density 2 do
+          sleep 1
+          with_fx :pan, pan: -0.65 do
+            sample PERCS, "Bucket01", rate: 2.5, cutoff: cmaster1, amp: a
+            sample PERCS, "Bucket02", rate: 2.2, start: 0.02, cutoff: cmaster1, amp: a
+            sleep 0.25
+            sample PERCS, "Bucket03", rate: 2, start: 0.04, cutoff: cmaster1, amp: a
+          end
+          sleep 1
+        end
+      end
+      
+      live_loop :bottle, sync: :percussion do
+        a = 0.45
+        sleep 1
+        with_fx :pan, pan: -0.85 do
+          sample PERCS, "Bottle10", rate: 2.5, cutoff: cmaster1, amp: a
+          sample PERCS, "Bottle11", rate: 2.2, start: 0.02, cutoff: cmaster1, amp: a
+          sleep 0.25
+          sample PERCS, "Bottle14", rate: 2, start: 0.04, cutoff: cmaster1, amp: a
+        end
+        sleep 4
+      end
+    end
+  end
+end

@@ -1,0 +1,34 @@
+use_synth :piano
+
+# Set the tempo
+use_bpm 60
+
+use_midi_defaults port: "midi_through_midi_through_port-0_14_0"
+
+
+# Define the piano intro notes
+intro_notes = (ring :C4, :E4, :G4, :C5, :B4, :G4, :E4, :C4)
+
+# Define the intro duration
+intro_duration = 4
+
+# Play the piano intro
+intro_duration.times do
+  with_synth :piano do
+    play_pattern_timed intro_notes, 0.5
+  end
+end
+
+# Wait for 8 measures before introducing the strings
+sleep intro_duration * 8
+
+# Add strings to the composition using midi
+live_loop :strings_theme1 do
+  with_transpose 12 do
+    intro_duration.times do |i|
+      midi intro_notes[i], channel: 1
+      sleep 0.5
+    end
+  end
+end
+
