@@ -6,8 +6,9 @@ def write_md_file(title, json_data, i, output)
   new_md = <<~MD
     # #{i} #{title}
 
-    #{json_data.map { |message| "## #{message['author']['role']}: #{message['content']['parts'].join.gsub("\n", "  \n")}" }.join("\n\n")}
+    #{json_data.map { |message| "## #{message['author']['role']}: #{message['content']['parts'].join.gsub("\n", "  \n")}\n---\n" }.join("\n\n")}
   MD
+
 
   File.write(File.join(output, "chat_#{i}.md"), new_md)
 end
@@ -37,7 +38,7 @@ end
 
 json_file = ARGV[0]
 
-output = File.join(File.dirname(json_file), 'chats')
+output = File.join(File.dirname(json_file), 'chats', 'v2')
 
 FileUtils.mkdir output unless Dir.exist?(output)
 
