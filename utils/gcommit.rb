@@ -1,5 +1,36 @@
 #!/usr/bin/env ruby
 require 'openai'
+require 'logging'
+
+# Set up logging configuration
+Logging.color_scheme('bright',
+  :levels => {
+    :info  => :green,
+    :warn  => :yellow,
+    :error => :red,
+    :fatal => [:white, :on_red]
+  },
+  :date => :blue,
+  :logger => :cyan,
+  :message => :magenta
+)
+
+# Configure appenders
+stdout_appender = Logging.appenders.stdout(
+  'stdout',
+  :layout => Logging.layouts.pattern(
+    :pattern => '[%d] %-5l %c: %m\n',
+    :color_scheme => 'bright'
+  ),
+  :level => :debug
+)
+
+# Create a logger with appenders
+$logger = Logging.logger['gdiffsum']
+$logger.add_appenders(stdout_appender)
+
+# Set the log level
+$logger.level = :debug
 
 # Configure OpenAI with your API key
 OpenAI.configure do |config|
@@ -12,15 +43,34 @@ client = OpenAI::Client.new
 # Read the piped input
 diff = ARGF.read
 
+# Best practices for commit messages
+best_practices = """
+1. Separate subject from body with a blank line.
+2. Limit the subject line to 50 characters.
+3. Do not end the subject line with a period.
+4. Use the imperative mood in the subject line.
+5. Wrap the body at 72 characters.
+6. Use the body to explain what and why vs. how.
+"""
+
 # Generate a summary of the diff using OpenAI
-response = client.completions(
+response = client.chat(
   parameters: {
-    model: "text-davinci-002",
-    prompt: "Summarize the following git diff:\n#{diff}\n",
-    temperature: 0.3,
-    max_tokens: 60
+    model: "gpt-3.5-turbo-16k",
+    messages: [
+      {role: "system", content: best_practices},
+      {role: "user", content: "Summarize the following git diff:\n#{diff}\n"}
+    ],
+    temperature: 0.2,
+    max_tokens: 512,
+    frequency_penalty: 0.2,
+    presence_penalty: 0.5
   }
 )
 
-# Print the summary
-puts response['choices'].first['text'].strip
+$logger.debug(response)
+
+# Get the summary and escape it for use in a shell command
+summary = response['choices'][0]['message']['content'].strip
+
+puts "#{summary}"
