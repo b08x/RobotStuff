@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-require 'openai'
+require 'ruby/openai'
 require 'rugged'
 
 class Repository

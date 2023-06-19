@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-require 'openai'
+require 'ruby/openai'
 require 'logging'
 
 # Set up logging configuration
@@ -56,15 +56,15 @@ best_practices = """
 # Generate a summary of the diff using OpenAI
 response = client.chat(
   parameters: {
-    model: "gpt-3.5-turbo-16k",
+    model: "gpt-3.5-turbo",
     messages: [
       {role: "system", content: best_practices},
       {role: "user", content: "Summarize the following git diff:\n#{diff}\n"}
     ],
-    temperature: 0.2,
-    max_tokens: 512,
-    frequency_penalty: 0.2,
-    presence_penalty: 0.5
+    temperature: 0.5,
+    max_tokens: 1024
+    # frequency_penalty: 0.2,
+    # presence_penalty: 0.5
   }
 )
 
