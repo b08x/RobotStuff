@@ -11,7 +11,7 @@ TMPFS = File.join("/tmp/robotstuff")
 
 def progname; "robotstuff"; end
 
-module robotstuff
+module RobotStuff
   VERSION = "0.9.8"
 end
 
