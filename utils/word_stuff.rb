@@ -61,17 +61,17 @@ end
 client = OpenAI::Client.new
 
 
-def get_meronyms(word):
-
-def get_holonyms(word):
-
-
-def tokenizer
-
-def stopwords_filter
-
-Stanza lemmatizer
-https://medium.com/@yashj302/lemmatization-f134b3089429
+# def get_meronyms(word):
+#
+# def get_holonyms(word):
+#
+#
+# def tokenizer
+#
+# def stopwords_filter
+#
+# Stanza lemmatizer
+# https://medium.com/@yashj302/lemmatization-f134b3089429
 
 
 system_prompt = """
@@ -89,3 +89,58 @@ messages = [
     {"role": "system", "content": "You are an AI language model trained to analyze and summarize product reviews."},
     {"role": "user", "content": f"Summarize the following product review, highlighting pros and cons: {review}"}
 ]
+
+## example function call
+
+def get_current_weather(location:, unit: "fahrenheit")
+  # use a weather api to fetch weather
+end
+
+response =
+  client.chat(
+    parameters: {
+      model: "gpt-3.5-turbo-0613",
+      messages: [
+        {
+          "role": "user",
+          "content": "What is the weather like in San Francisco?",
+        },
+      ],
+      functions: [
+        {
+          name: "get_current_weather",
+          description: "Get the current weather in a given location",
+          parameters: {
+            type: :object,
+            properties: {
+              location: {
+                type: :string,
+                description: "The city and state, e.g. San Francisco, CA",
+              },
+              unit: {
+                type: "string",
+                enum: %w[celsius fahrenheit],
+              },
+            },
+            required: ["location"],
+          },
+        },
+      ],
+    },
+  )
+
+message = response.dig("choices", 0, "message")
+
+if message["role"] == "assistant" && message["function_call"]
+  function_name = message.dig("function_call", "name")
+  args =
+    JSON.parse(
+      message.dig("function_call", "arguments"),
+      { symbolize_names: true },
+    )
+
+  case function_name
+  when "get_current_weather"
+    get_current_weather(**args)
+  end
+end
