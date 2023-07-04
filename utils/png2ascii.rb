@@ -25,55 +25,48 @@ class ImageConversionCommand
 end
 
 # Command for converting images to ASCII
-class AsciiConversionCommand < ImageConversionCommand
-  def execute(file, output_folder, options)
-    clean_name = clean_file_name(File.basename(file))
-    output_file = File.join(output_folder, "#{clean_name}.txt")
+# class AsciiConversionCommand < ImageConversionCommand
+#   def execute(file, output_folder, options)
+#     clean_name = clean_file_name(File.basename(file))
+#     output_file = File.join(output_folder, "#{clean_name}.txt")
 
-    # Prompt the user to select additional options
-    prompt = TTY::Prompt.new
-    selected_options = prompt.multi_select('Select additional options:', %w[Grayscale Negative Save-Image])
-    options[:grayscale] = selected_options.include?('Grayscale')
-    options[:negative] = selected_options.include?('Negative')
-    options[:save_image] = selected_options.include?('Save-Image')
+#     # Prompt the user to select additional options
+#     prompt = TTY::Prompt.new
+#     selected_options = prompt.multi_select('Select additional options:', %w[Grayscale Negative Save-Image])
+#     options[:grayscale] = selected_options.include?('Grayscale')
+#     options[:negative] = selected_options.include?('Negative')
+#     options[:save_image] = selected_options.include?('Save-Image')
 
-    # Build the command to convert the image to ASCII
-    ascii_command = "ascii-image-converter #{file}"
-    if options[:dimensions]
-      ascii_command += " -d #{options[:dimensions].join(',')}"
-    elsif options[:width] && options[:height]
-      ascii_command += " -d #{options[:width]},#{options[:height]}"
-    else
-      logger.error("Missing dimensions for ASCII conversion. Please provide --dimensions or --width and --height.")
-      return
-    end
+#     # Build the command to convert the image to ASCII
+#     ascii_command = "ascii-image-converter -C -c"
 
-    ascii_command += ' -g' if options[:grayscale]
-    ascii_command += ' -n' if options[:negative]
 
-    logger.info("Converting file to ASCII: #{file}")
+#     ascii_command += ' -g' if options[:grayscale]
+#     ascii_command += ' -n' if options[:negative]
 
-    # Execute the command with logger as output
-    command_result = TTY::Command.new(output: logger).run(ascii_command)
+#     logger.info("Converting file to ASCII: #{file}")
 
-    # Save the ASCII art to the output file
-    File.write(output_file, command_result.out)
+#     # Execute the command with logger as output
+#     command_result = TTY::Command.new(output: logger).run(ascii_command)
 
-    logger.success("Converted file to ASCII: #{file}. Saved to: #{output_file}")
+#     # Save the ASCII art to the output file
+#     File.write(output_file, command_result.out)
 
-    if options[:save_image]
-      save_image_path = prompt.ask('Enter path to save the ASCII art as PNG:')
-      save_image_path = output_folder if save_image_path.nil? || save_image_path.strip.empty?
+#     logger.success("Converted file to ASCII: #{file}. Saved to: #{output_file}")
 
-      save_image_file = File.join(save_image_path, "#{clean_name}-ascii-art.png")
-      save_image_command = "convert #{output_file} #{save_image_file}"
+#     if options[:save_image]
+#       save_image_path = prompt.ask('Enter path to save the ASCII art as PNG:')
+#       save_image_path = output_folder if save_image_path.nil? || save_image_path.strip.empty?
 
-      logger.info("Saving ASCII art as PNG: #{save_image_file}")
-      TTY::Command.new(output: logger).run(save_image_command)
-      logger.success("ASCII art saved as PNG: #{save_image_file}")
-    end
-  end
-end
+#       save_image_file = File.join(save_image_path, "#{clean_name}-ascii-art.png")
+#       save_image_command = "convert #{output_file} #{save_image_file}"
+
+#       logger.info("Saving ASCII art as PNG: #{save_image_file}")
+#       TTY::Command.new(output: logger).run(save_image_command)
+#       logger.success("ASCII art saved as PNG: #{save_image_file}")
+#     end
+#   end
+# end
 
 
 # Command for converting images to WebP
@@ -111,22 +104,22 @@ class PngConversionCommand < ImageConversionCommand
 end
 
 # Parse the command-line options
-options = {}
-OptionParser.new do |opts|
-  opts.banner = 'Usage: image_converter.rb [options] folder_path'
+# options = {}
+# OptionParser.new do |opts|
+#   opts.banner = 'Usage: image_converter.rb [options] folder_path'
 
-  opts.on('-f', '--format FORMAT', [:ascii, :webp, :png], 'Output format (ascii, webp, png)') do |format|
-    options[:format] = format
-  end
+#   opts.on('-f', '--format FORMAT', [:ascii, :webp, :png], 'Output format (ascii, webp, png)') do |format|
+#     options[:format] = format
+#   end
 
-  opts.on('-W', '--width WIDTH', Integer, 'Output image width') do |width|
-    options[:width] = width
-  end
+#   opts.on('-W', '--width WIDTH', Integer, 'Output image width') do |width|
+#     options[:width] = width
+#   end
 
-  opts.on('-H', '--height HEIGHT', Integer, 'Output image height') do |height|
-    options[:height] = height
-  end
-end.parse!
+#   opts.on('-H', '--height HEIGHT', Integer, 'Output image height') do |height|
+#     options[:height] = height
+#   end
+# end.parse!
 
 # Initialize TTY Logger
 logger = TTY::Logger.new(output: STDOUT)
@@ -154,19 +147,13 @@ else
 end
 
 folder_path = ARGV.first
+
 output_folder = "#{File.expand_path(folder_path)}/converted"
+
 Dir.mkdir(output_folder) unless Dir.exist?(output_folder)
 
-# If dimensions were not specified, prompt the user to input them
-if options[:width].nil? || options[:height].nil?
-  prompt = TTY::Prompt.new
-  options[:width] = prompt.ask('Enter output image width:') do |q|
-    q.convert :int
-  end
-  options[:height] = prompt.ask('Enter output image height:') do |q|
-    q.convert :int
-  end
-end
+
+conversion_command
 
 # Execute the conversion command for each image in the folder
 Dir.glob("#{folder_path}/*.{png,img}") do |file|

@@ -65,6 +65,7 @@ response = client.chat(
       {role: "user", content: "Summarize the following git diff:\n\n###\n\n#{diff}\n"}
     ],
     temperature: 0.3,
+    top_p: 0.2,
     max_tokens: 4096,
     frequency_penalty: 0.2,
     presence_penalty: 0.2
