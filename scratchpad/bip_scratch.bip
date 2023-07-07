@@ -1,0 +1,63 @@
+//local monoInput = Lv2.Plugin("http://calf.sourceforge.net/plugins/MonoInput")
+//monoInput.control("level_in", 3.0)
+//monoInput.control("level_out", 1.0)
+//monoInput.control("balance_out", -1.0)
+//monoInput.control("softclip", 0.0)
+
+//inputSnowball => monoInput
+//inputUSB => monoInput
+//
+//inputPowerMic => monoInput
+
+mixer.add(inputSystem)
+//mixer.add(inputPowerMic)
+//mixer.add(inputSnowball)
+//mixer.add(monoInput)
+
+//local hpf = Lv2.Plugin("http://moddevices.com/plugins/mod-devel/HighPassFilter")
+//hpf.control("Freq", 60)
+//hpf.control("Order", 2)
+
+//
+
+
+mixer => filter
+
+local output = Audio.StereoOutput("main_output", false)
+
+filter => output
+
+//
+//
+local port = 9033
+local oscInput = Osc.Input(port)
+println("listening on port " + port + "..")
+
+oscInput.onReceive(function(message) {
+	switch(message.path) {
+
+	case "/mute/0":
+		println(message.arg(0))
+		mixer.gain(0, 0, 0.6)
+		mixer.gain(1, 1, 0.6)
+//		mixer.gain(2, 0, 0.6)
+//		mixer.gain(3, 1, 0.6)
+		break;
+	case "/mute/1":
+		println(message.arg(0))
+		mixer.gain(0, 0, 0.0)
+		mixer.gain(1, 1, 0.0)
+//		mixer.gain(2, 0, 0.0)
+//		mixer.gain(3, 1, 0.0)
+		break;
+	default:
+	  println("warning: this is not a message path " + message.path)
+	}
+})
+
+
+//mixer => hpf => output
+
+//mixer.output[0] -> hpf.input[0]
+//hpf.output[0] -> output.input[0]
+//mixer.output[1] -> output.input[1]
