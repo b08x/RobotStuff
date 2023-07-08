@@ -8,7 +8,7 @@ class MarkdownFile
   def select_markdown_file
     last_selected_file = @config.fetch(:last_selected_file, nil)
 
-    markdown_files = file_list(File.join(WORKSPACE, 'obsidian'))
+    markdown_files = file_list(NOTEBOOK)
 
     markdown_files.delete_if { |file| file.include?("chatGPTexports")}
 

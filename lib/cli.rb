@@ -1,7 +1,6 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: false
 
-require 'daemons'
 require "drydock"
 require "highline/import"
 
@@ -21,12 +20,10 @@ module RobotStuff
       puts "hey...this is what this is about!"
     end
 
-    about "main menu"
-    command :menu do |_obj|
-      RobotStuff::Menu.start
+    about "transcribe"
+    command :transcribe do |_obj|
+      #TOOD
     end
-
-
 
   end # end cli class
 end # end soundbot module

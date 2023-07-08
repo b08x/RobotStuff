@@ -31,21 +31,21 @@ class TranscribeCommand
     # Transcribe audio
     transcription = transcribe_audio(TEMP_FILE_PATH)
 
+    #Clipboard.copy("#{transcription}")
+
+    system("echo #{transcription} | xclip -selection clipboard")
+    #
+    # # # puts "#{clipb}"
+    # fork do
+    #   exec("xclip -o | xclip -selection clipboard")
+    # end
+
     # Print transcription
     puts 'Transcription:'
     puts transcription
 
     # Write transcription to the selected file
     write_transcription_to_file(transcription, @selected_file)
-
-    Clipboard.copy("#{transcription}")
-
-    `echo #{transcription} | xclip -selection clipboard`
-
-    # # puts "#{clipb}"
-    # fork do
-    #   exec("xclip -o | xclip -selection clipboard")
-    # end
 
     # Delete temporary WAV file
     delete_temp_file
@@ -119,22 +119,37 @@ class TranscribeCommand
 
   # Transcribes the audio file
   def transcribe_audio(filename)
-    client = OpenAI::Client.new(access_token: @openai_access_token)
 
-    response = client.transcribe(
-      parameters: {
-        model: 'whisper-1',
-        file: File.open(filename, 'rb')
-      }
-    )
+    begin
+      client = OpenAI::Client.new(access_token: @openai_access_token)
 
-    response['text']
+      response = client.transcribe(
+        parameters: {
+          model: 'whisper-1',
+          file: File.open(filename, 'rb')
+        }
+      )
+
+      if response["error"]
+        $logger.fatal("#{response["error"]["message"]}")
+        exit
+      else
+        response['text']
+      end
+
+    rescue StandardError => e
+      $logger.fatal("something failed #{e}")
+    end
+
   end
 
   # Writes the transcription to the selected file
   def write_transcription_to_file(transcription, file)
     File.open(file.shellescape, 'a') { |f| f.write("\n#{transcription}\n") }
     $logger.debug("Transcription written to file. #{file}")
+    #FIXME: record_audio_with_jack doesn't exit gracefully,
+    # so as a work-around we exit here
+    exit
   end
 
   # Deletes the temporary WAV file

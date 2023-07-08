@@ -5,15 +5,11 @@ require 'logging'
 require 'pathname'
 require 'pry-stack_explorer'
 
-APP_ROOT = File.expand_path("../../", __FILE__)
-
 LOG_DIR = File.join(File.expand_path("../../", __FILE__), "logs")
+LOG = File.join(LOG_DIR, "#{Time.now.strftime("%Y-%m-%d")}.log")
+
 LOG_MAX_SIZE = 6_145_728
 LOG_MAX_FILES = 10
-
-log_file = File.join(LOG_DIR, "#{progname}-#{Time.now.strftime("%Y-%m-%d")}.log")
-
-$osc_log = File.join("#{progname}-#{Time.now.strftime("%Y-%m-%d")}_osc.log")
 
 unless Pathname.new(LOG_DIR).exist?
   Pathname.new(LOG_DIR).mkdir
@@ -42,7 +38,7 @@ Logging.appenders.stdout(
 )
 
 Logging.appenders.file(
-  log_file,
+  LOG,
   :layout => Logging.layouts.pattern(
     :pattern => '[%d] %-5l %c: %m\n',
     :color_scheme => 'bright'
@@ -54,7 +50,7 @@ $logger = Logging.logger['Happy::Colors']
 
 $logger.add_appenders(
         Logging.appenders.stdout,
-        Logging.appenders.file(log_file))
+        Logging.appenders.file(LOG))
 
 $logger.debug
 
@@ -69,7 +65,7 @@ end
 $daemon_options = {
   :log_output => true,
   :backtrace => true,
-  :output_logfilename => $osc_log,
+  :output_logfilename => LOG,
   :log_dir =>  LOG_DIR,
   :ontop => false
 }
