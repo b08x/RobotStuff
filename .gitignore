@@ -1,2 +1,4 @@
 Gemfile.lock
 sonic-pi/modules/ziffers/ziffers.wiki/
+config.yml
+logs/**

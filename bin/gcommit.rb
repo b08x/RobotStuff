@@ -62,9 +62,9 @@ response = client.chat(
     model: "gpt-3.5-turbo-16k",
     messages: [
       {role: "system", content: best_practices},
-      {role: "user", content: "Summarize the following git diff:\n\n###\n\n#{diff}\n"}
+      {role: "user", content: "Summarize the following git diff for a git commit message:\n\n###\n\n#{diff}\n"}
     ],
-    temperature: 0.3,
+    temperature: 0.4,
     top_p: 0.2,
     max_tokens: 4096,
     frequency_penalty: 0.2,
