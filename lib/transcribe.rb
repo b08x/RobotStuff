@@ -31,21 +31,21 @@ class TranscribeCommand
     # Transcribe audio
     transcription = transcribe_audio(TEMP_FILE_PATH)
 
+    #Clipboard.copy("#{transcription}")
+
+    system("echo #{transcription} | xclip -selection clipboard")
+    #
+    # # # puts "#{clipb}"
+    # fork do
+    #   exec("xclip -o | xclip -selection clipboard")
+    # end
+
     # Print transcription
     puts 'Transcription:'
     puts transcription
 
     # Write transcription to the selected file
     write_transcription_to_file(transcription, @selected_file)
-
-    Clipboard.copy("#{transcription}")
-
-    `echo #{transcription} | xclip -selection clipboard`
-
-    # # puts "#{clipb}"
-    # fork do
-    #   exec("xclip -o | xclip -selection clipboard")
-    # end
 
     # Delete temporary WAV file
     delete_temp_file

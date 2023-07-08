@@ -9,7 +9,7 @@ require 'tty-config'
 require 'tty-which'
 require 'tty-prompt'
 
-require 'logger'
+require 'loger'
 require 'audio_input'
 require 'file_select'
 require 'transcribe'
@@ -17,6 +17,8 @@ require 'i3_nav'
 
 
 NOTEBOOK = File.join(Dir.home, "Notebook")
+
+APP_ROOT = File.expand_path("../../", __FILE__)
 
 # Method that initiates the transcription process
 def main
@@ -27,10 +29,6 @@ def main
   # Select the input device
   input_device = InputDevice.new(config)
   selected_port = input_device.select_input_device
-
-  #TODO: menu to select a file
-  #prompt = TTY::Prompt.new
-  #new_file = prompt.ask("Select a new file?", convert: :boolean)
 
   # Prompt for the markdown file to paste the transcription
   markdown_file = MarkdownFile.new(config)
