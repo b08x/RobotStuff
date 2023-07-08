@@ -16,12 +16,12 @@ require 'transcribe'
 require 'i3_nav'
 
 
-WORKSPACE = File.join(Dir.home, "Workspace")
+NOTEBOOK = File.join(Dir.home, "Notebook")
 
 # Method that initiates the transcription process
 def main
   config = TTY::Config.new
-  config.append_path File.join(APP_ROOT, 'bin')
+  config.append_path APP_ROOT
   config.read if config.exist?
 
   # Select the input device
@@ -31,7 +31,7 @@ def main
   #TODO: menu to select a file
   #prompt = TTY::Prompt.new
   #new_file = prompt.ask("Select a new file?", convert: :boolean)
-  
+
   # Prompt for the markdown file to paste the transcription
   markdown_file = MarkdownFile.new(config)
   selected_file = if ARGV[0] == '--new-file'

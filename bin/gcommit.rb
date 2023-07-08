@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 require 'ruby/openai'
 require 'logging'
+require 'clipboard'
 
 # Set up logging configuration
 Logging.color_scheme('bright',
