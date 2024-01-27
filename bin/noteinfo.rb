@@ -10,6 +10,7 @@ require 'tty-box'
 require 'tty-cursor'
 require 'tty-prompt'
 require 'tty-screen'
+require 'tty-reader'
 
 args = ARGV[0]
 
@@ -58,6 +59,13 @@ def box_info(midi_note,symbolic_note,frequency)
 end
 
 continue = "True"
+
+reader = TTY::Reader.new
+
+reader.on(:keyctrl_x, :keyescape) do
+  puts "Exiting..."
+  exit
+end
 
 while continue == "True"
   puts TTY::Cursor.clear_screen
@@ -126,6 +134,11 @@ while continue == "True"
 
   #(0..2).each { |x| print "\n"}
   # system("notify-send 'midi note #{midi_note} #{symbolic_note}'")
+
+  #loop do
+    line = reader.read_line("=> ")
+    break if line =~ /^exit/i
+  #end
   continue = prompt.keypress('Depress any key for action ...', timeout: 60)
 
   continue = "True" if continue

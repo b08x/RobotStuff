@@ -3,7 +3,7 @@
 # Requires: rofi, devdocs, i3-sensible-terminal, qutebrowser nerdfonts
 files=~/.cache/rofi-search_term_list
 
-BROWSER="firefox"
+BROWSER="google-chrome-stable"
 GOOGLE_SEARCH_URL="https://google.com/search?q"
 BRAVE_SEARCH_URL="https://search.brave.com/search?q"
 

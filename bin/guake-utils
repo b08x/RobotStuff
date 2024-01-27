@@ -15,7 +15,7 @@ elif [ "$1" == "import" ]; then
 
 elif [ "$1" == "export" ]; then
     echo "Exporting preferences to ~/.guake"
-    dconf dump /apps/guake/ > "$HOME/.guake/config.dconf"
+    guake --save-preferences > "$HOME/.guake/config"
     echo "Done!"
 
 else

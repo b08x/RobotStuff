@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #set -vx
 
-declare OUTPUTS="/tmp/outputs.txt"
-declare INPUTS="/tmp/inputs.txt"
+declare OUTPUTS="/tmp/jack_load/outputs"
+declare INPUTS="/tmp/jack_load/inputs"
 
-if [ -f $OUTPUTS ] || [ -f $INPUTS ];then
-  rm -rf $OUTPUTS $INPUTS
+if [[ ! -d /tmp/jack_load ]]; then
+  mkdir -pv /tmp/jack_load
 fi
 
 function loadInput {
@@ -26,7 +26,7 @@ function loadOutput {
 
 }
 
-echo "Is this an input or output device? "
+echo "Select action for jack_load "
 choice=$(gum choose input output unload)
 
 case $choice in
@@ -36,6 +36,7 @@ case $choice in
     device=$(cat $INPUTS | gum choose | awk '{print $2}' | sed 's/://g')
     echo "give this device an alias(no spaces)"
     name=$(gum input|sed 's/ /_/g')
+    echo "${name}" >> $INPUTS
     loadInput $name $device
     ;;
   output)
@@ -44,11 +45,14 @@ case $choice in
     device=$(cat $OUTPUTS | gum choose | awk '{print $2}' | sed 's/://g')
     echo "give this device an alieas(no spaces)"
     name=$(gum input|sed 's/ /_/g')
+    echo "${name}" >> $OUTPUTS
     loadOutput $name $device
     ;;
   unload)
     echo "unload which device?"
-    name=$(gum input)
+    name=$(cat $OUTPUTS $INPUTS|gum choose)
+    #TODO: improve this logic, check against jack_lsp
+    # name=$(gum input)
     jack_unload $name
     ;;
 

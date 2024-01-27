@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 declare -rx archive=REAPER-$(date +%Y%m%d%H).tar.gz
-declare -rx destination="$HOME/Library/reaper/"
+declare -rx destination="$HOME/Public/Library/Studio/reaper/"
 
 if [[ -d $destination ]]; then
 	if [[ -f $destination/$archive ]]; then
@@ -11,7 +11,7 @@ if [[ -d $destination ]]; then
   	tar -czvf $archive REAPER/
 
   	if [ $? = 0 ]; then
-    	mv $archive ~/Library/reaper/
+    	mv $archive $destination
   	else
     	echo "archive did not complete"
   	fi
