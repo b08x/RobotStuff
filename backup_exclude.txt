@@ -1,0 +1,10 @@
+**cache**
+*.git
+*.ray-snapshots
+*.xmp
+PolyGlot-3.5.1/
+LLMOS/
+_site/
+.Trash-1000/
+Obsidian_Playground/
+.jekyll-metadata/
