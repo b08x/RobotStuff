@@ -9,9 +9,9 @@ if [[ -d $backupdelta ]]; then
 
 	mkdir -pv $backupdelta/$timestampe
 
-	rsync -rtPp --log-file=rsync.log --stats --delete --delete-before --delete-excluded --progress --ignore-existing -u -l -b -i -s \
+	rsync -rtPpn --log-file=rsync.log --stats --delete --delete-before --delete-excluded --progress --ignore-existing -u -l -b -i -s \
 		--suffix="_backup" --backup-dir=$backupdelta/$timestampe \
-		--exclude-from=/home/b08x/RobotStuff/backup_exclude.txt /home/b08x/Public/ /mnt/bender/backup/Public/
+		--exclude-from=/home/b08x/RobotStuff/backup_exclude.txt /home/b08x/Public /home/b08x/Recordings /mnt/bender/backup/
 
 	chown -R b08x:b08x $backupdelta/$timestampe
 else
